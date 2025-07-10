@@ -71,10 +71,29 @@ export const siteResolvers = {
     },
   },
   Query: {
-    siteKPIStats: async (_: any, args: { siteId: string; startAt: string; endAt: string }) => {
+    siteKPIStats: async (
+      _: any,
+      args: { siteId: string; startAt: string; endAt: string },
+      context: { userId?: string }
+    ) => {
       const { siteId, startAt, endAt } = args;
+      const userId = context.userId;
+
+      if (!userId) {
+        throw new Error("Unauthorized");
+      }
 
       try {
+        const siteCheck = await pool.query(`SELECT 1 FROM sites WHERE id = $1 AND user_id = $2`, [
+          siteId,
+          userId,
+        ]);
+
+        if (siteCheck.rowCount === 0) {
+          throw new Error("Unauthorized: Site does not belong to user.");
+        }
+
+        
         const [
           uniqueVisitorsResult,
           totalVisitsResult,
@@ -82,57 +101,48 @@ export const siteResolvers = {
           bounceRateResult,
           averageDurationResult,
         ] = await Promise.all([
-          // Unique Visitors
           pool.query(
-            `SELECT COUNT(DISTINCT session_id) AS count
-         FROM visits
-         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+          `SELECT COUNT(DISTINCT session_id) AS count
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
-
-          // Total Visits
           pool.query(
-            `SELECT COUNT(*) AS count
-         FROM visits
-         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+          `SELECT COUNT(*) AS count
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
-
-          // Views Per Visit
           pool.query(
-            `SELECT CASE
-           WHEN COUNT(DISTINCT session_id) = 0 THEN 0
-           ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
-         END AS value
-         FROM visits
-         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+          `SELECT CASE
+          WHEN COUNT(DISTINCT session_id) = 0 THEN 0
+          ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
+          END AS value
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
-
-          // Bounce Rate
           pool.query(
-            `SELECT CASE
-           WHEN COUNT(*) = 0 THEN 0
-           ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
-         END AS value
-         FROM (
-           SELECT session_id, COUNT(*) AS visit_count
-           FROM visits
-           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-           GROUP BY session_id
-         ) sub`,
+          `SELECT CASE
+          WHEN COUNT(*) = 0 THEN 0
+          ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
+          END AS value
+          FROM (
+          SELECT session_id, COUNT(*) AS visit_count
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+          GROUP BY session_id
+          ) sub`,
             [siteId, startAt, endAt]
           ),
-
-          // Average Visit Duration
           pool.query(
-            `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
-         FROM (
-           SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
-           FROM visits
-           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-           GROUP BY session_id
-         ) sub`,
+          `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
+          FROM (
+          SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+          GROUP BY session_id
+          ) sub`,
             [siteId, startAt, endAt]
           ),
         ]);
@@ -140,7 +150,7 @@ export const siteResolvers = {
         return {
           uniqueVisitors: parseInt(uniqueVisitorsResult.rows[0].count || "0"),
           totalVisits: parseInt(totalVisitsResult.rows[0].count || "0"),
-          totalPageviews: parseInt(totalVisitsResult.rows[0].count || "0"), 
+          totalPageviews: parseInt(totalVisitsResult.rows[0].count || "0"),
           viewsPerVisit: parseFloat(viewsPerVisitResult.rows[0].value || "0"),
           bounceRate: parseFloat(bounceRateResult.rows[0].value || "0"),
           averageVisitDuration: parseFloat(averageDurationResult.rows[0].value || "0"),
