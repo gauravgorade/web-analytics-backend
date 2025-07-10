@@ -15,6 +15,7 @@
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "geoip-lite": "^1.4.10",
     "graphql": "^15.10.1",
     "pg": "^8.16.3",
     "postgraphile": "^4.14.1",
