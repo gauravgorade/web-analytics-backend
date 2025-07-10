@@ -21,4 +21,18 @@ export const siteTypeDefs = gql`
   extend type Mutation {
     addSite(input: CustomCreateSiteInput!): AddSiteResponse
   }
+
+  type SiteKPIStats {
+  uniqueVisitors: Int!
+  totalVisits: Int!
+  totalPageviews: Int!
+  viewsPerVisit: Float!
+  bounceRate: Float!
+  averageVisitDuration: Float!
+}
+
+extend type Query {
+  siteKPIStats(siteId: UUID!): SiteKPIStats!
+}
+
 `;

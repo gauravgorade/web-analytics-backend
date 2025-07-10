@@ -7,7 +7,7 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   timezone TEXT NOT NULL DEFAULT 'UTC',
   date_format TEXT NOT NULL DEFAULT 'DD/MM/YYYY',
-  created_at TIMESTAMP DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE sites (
@@ -15,7 +15,7 @@ CREATE TABLE sites (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   public_key TEXT UNIQUE NOT NULL,
   domain TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMP DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE visits (
@@ -31,7 +31,7 @@ CREATE TABLE visits (
   city TEXT,
   os TEXT,
   browser TEXT,
-  created_at TIMESTAMP DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE events (
@@ -40,5 +40,5 @@ CREATE TABLE events (
   session_id TEXT,
   name TEXT NOT NULL,
   event_data JSONB,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT now()
 );
