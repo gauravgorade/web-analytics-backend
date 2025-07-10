@@ -71,8 +71,8 @@ export const siteResolvers = {
     },
   },
   Query: {
-    siteKPIStats: async (_: any, args: { siteId: string }) => {
-      const { siteId } = args;
+    siteKPIStats: async (_: any, args: { siteId: string; startAt: string; endAt: string }) => {
+      const { siteId, startAt, endAt } = args;
 
       try {
         const [
@@ -82,45 +82,50 @@ export const siteResolvers = {
           bounceRateResult,
           averageDurationResult,
         ] = await Promise.all([
-          pool.query(`SELECT COUNT(DISTINCT session_id) AS count FROM visits WHERE site_id = $1`, [
-            siteId,
-          ]),
-          pool.query(`SELECT COUNT(*) AS count FROM visits WHERE site_id = $1`, [siteId]),
           pool.query(
-            `
-            SELECT COUNT(*) * 1.0 / COUNT(DISTINCT session_id) AS value
-            FROM visits WHERE site_id = $1
-          `,
-            [siteId]
+            `SELECT COUNT(DISTINCT session_id) AS count
+         FROM visits
+         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            [siteId, startAt, endAt]
           ),
           pool.query(
-            `
-            SELECT COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*) AS value
-            FROM (
-              SELECT session_id, COUNT(*) AS visit_count
-              FROM visits WHERE site_id = $1
-              GROUP BY session_id
-            ) sub
-          `,
-            [siteId]
+            `SELECT COUNT(*) AS count
+         FROM visits
+         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            [siteId, startAt, endAt]
           ),
           pool.query(
-            `
-            SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
-            FROM (
-              SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
-              FROM visits WHERE site_id = $1
-              GROUP BY session_id
-            ) sub
-          `,
-            [siteId]
+            `SELECT COUNT(*) * 1.0 / COUNT(DISTINCT session_id) AS value
+         FROM visits
+         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            [siteId, startAt, endAt]
+          ),
+          pool.query(
+            `SELECT COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*) AS value
+         FROM (
+           SELECT session_id, COUNT(*) AS visit_count
+           FROM visits
+           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+           GROUP BY session_id
+         ) sub`,
+            [siteId, startAt, endAt]
+          ),
+          pool.query(
+            `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
+         FROM (
+           SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
+           FROM visits
+           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+           GROUP BY session_id
+         ) sub`,
+            [siteId, startAt, endAt]
           ),
         ]);
 
         return {
           uniqueVisitors: parseInt(uniqueVisitorsResult.rows[0].count || "0"),
           totalVisits: parseInt(totalVisitsResult.rows[0].count || "0"),
-          totalPageviews: parseInt(totalVisitsResult.rows[0].count || "0"), 
+          totalPageviews: parseInt(totalVisitsResult.rows[0].count || "0"),
           viewsPerVisit: parseFloat(viewsPerVisitResult.rows[0].value || "0"),
           bounceRate: parseFloat(bounceRateResult.rows[0].value || "0"),
           averageVisitDuration: parseFloat(averageDurationResult.rows[0].value || "0"),

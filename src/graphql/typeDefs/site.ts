@@ -32,7 +32,10 @@ export const siteTypeDefs = gql`
 }
 
 extend type Query {
-  siteKPIStats(siteId: UUID!): SiteKPIStats!
+  siteKPIStats(
+    siteId: UUID!
+    startAt: String!
+    endAt: String!
+  ): SiteKPIStats!
 }
-
 `;
