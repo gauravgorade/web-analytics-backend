@@ -1,0 +1,33 @@
+{
+  "name": "web-analytics-backend",
+  "version": "1.0.0",
+  "description": "Putler Web Analytics backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "graphql": "^15.10.1",
+    "pg": "^8.16.3",
+    "postgraphile": "^4.14.1",
+    "useragent": "^2.3.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/geoip-lite": "^1.4.4",
+    "@types/node": "^20.4.1",
+    "@types/useragent": "^2.3.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Output JavaScript will use modern features (like optional chaining)
+    "module": "CommonJS", // Use CommonJS module system (required by Node.js)
+    "rootDir": "./src", // Source TypeScript files are inside the "src" folder
+    "outDir": "./dist", // Compiled JavaScript will be emitted to "dist"
+    "moduleResolution": "node", // Resolve modules using Node-style resolution (e.g., node_modules)
+    "esModuleInterop": true, // Allow default imports from CommonJS modules (e.g., import express from 'express')
+    "strict": true, // Enable all strict type-checking options
+    "noImplicitReturns": true, // Ensure functions explicitly return a value
+    "noImplicitThis": true, // Ensure 'this' is typed correctly
+    "strictNullChecks": true, // Differentiates between 'null' and 'undefined'
+    "forceConsistentCasingInFileNames": true, // Prevent case mismatches in import paths (important on Linux/WSL)
+    "skipLibCheck": true, // Skip type checking for declaration files in node_modules
+    "sourceMap": false, // Generate .map files for debugging (useful in development)
+    "removeComments": true, // Remove all comments in the output JS (for production)
+  },
+  "include": ["src/**/*"], // Include all files in src recursively
+  "exclude": ["node_modules", "dist"] // Ignore node_modules and output directory
+}
