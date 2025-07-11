@@ -7,15 +7,58 @@
   const COLLECT_URL = BASE_URL + "/collect";
   const EVENT_URL = BASE_URL + "/event";
 
-  const sessionId = (() => {
-    const key = "_putlerwa_session_id";
-    let id = localStorage.getItem(key);
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem(key, id);
+  const SESSION_ID_KEY = "_putlerwa_session_id";
+  const LAST_ACTIVITY_KEY = "_putlerwa_last_activity";
+  const SESSION_TIMEOUT_MINUTES = 15;
+  const timeoutDuration = SESSION_TIMEOUT_MINUTES * 60 * 1000;
+
+  const now = () => Date.now();
+
+  function hasSessionExpired() {
+    const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
+    return now() - last > timeoutDuration;
+  }
+
+  function createNewSession() {
+    const newId = crypto.randomUUID();
+    localStorage.setItem(SESSION_ID_KEY, newId);
+    localStorage.setItem(LAST_ACTIVITY_KEY, now().toString());
+    return newId;
+  }
+
+  function getOrCreateSession() {
+    const existingId = localStorage.getItem(SESSION_ID_KEY);
+    if (!existingId || hasSessionExpired()) {
+      return createNewSession();
+    } else {
+      localStorage.setItem(LAST_ACTIVITY_KEY, now().toString());
+      return existingId;
     }
-    return id;
-  })();
+  }
+
+  let sessionId = getOrCreateSession();
+
+  function updateActivity() {
+    localStorage.setItem(LAST_ACTIVITY_KEY, now().toString());
+    resetInactivityTimer();
+  }
+
+  let inactivityTimer = null;
+  function resetInactivityTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      localStorage.removeItem(SESSION_ID_KEY);
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
+      sessionId = createNewSession();
+    }, timeoutDuration);
+  }
+
+  // Reset inactivity timer on interaction
+  ["click", "scroll", "keydown", "mousemove", "visibilitychange"].forEach((event) => {
+    window.addEventListener(event, updateActivity);
+  });
+
+  resetInactivityTimer();
 
   const baseData = {
     site_public_key: SITE_PUBLIC_KEY,
