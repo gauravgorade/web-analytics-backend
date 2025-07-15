@@ -6,7 +6,17 @@ export const commonTypes = gql`
     message: String!
   }
 
+  interface QueryResponse {
+    success: Boolean!
+    message: String!
+  }
+
   type BasicResponse implements MutationResponse {
+    success: Boolean!
+    message: String!
+  }
+
+  type BasicQueryResponse implements QueryResponse {
     success: Boolean!
     message: String!
   }

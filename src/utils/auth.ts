@@ -29,9 +29,15 @@ export async function assertUserOwnsSite(userId: string, siteId: string) {
   return { success: true };
 }
 
-export function assertAuthenticated(context: { userId?: string }) {
+type AuthSuccess = { success: true; userId: string };
+type AuthError = { success: false; message: string; data?: any };
+
+export function assertAuthenticated(context: { userId?: string }): AuthSuccess | AuthError {
   if (!context.userId) {
-    return errorResponse("Unauthorized: User not authenticated.");
+    return {
+      success: false,
+      message: "Unauthorized: User not authenticated.",
+    };
   }
 
   return { success: true, userId: context.userId };

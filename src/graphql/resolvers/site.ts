@@ -1,16 +1,15 @@
 import { randomUUID } from "crypto";
 import { pool } from "../../db";
 import { successResponse, errorResponse } from "../../utils/response";
+import { assertAuthenticated, assertUserOwnsSite } from "../../utils";
 
 export const siteResolvers = {
   Mutation: {
     addSite: async (_: any, args: any, context: any) => {
       const { domain } = args.input;
-      const userId = context.userId;
-
-      if (!userId) {
-        return errorResponse("Unauthorized", { site: null });
-      }
+      const auth = assertAuthenticated(context);
+      if (!auth.success) return auth;
+      const userId = auth?.userId;
 
       const cleanedDomain = domain
         .trim()
@@ -62,25 +61,17 @@ export const siteResolvers = {
     siteKPIStats: async (
       _: any,
       args: { siteId: string; startAt: string; endAt: string },
-      context: { userId?: string }
+      context: any
     ) => {
-      const { siteId, startAt, endAt } = args;
-      const userId = context.userId;
+      const auth = assertAuthenticated(context);
+      if (!auth.success) return auth;
 
-      if (!userId) {
-        return errorResponse("Unauthorized", { data: null });
-      }
+      const privilegeCheck = await assertUserOwnsSite(auth.userId, args.siteId);
+      if (!privilegeCheck.success) return privilegeCheck;
+
+      const { siteId, startAt, endAt } = args;
 
       try {
-        const siteCheck = await pool.query(`SELECT 1 FROM sites WHERE id = $1 AND user_id = $2`, [
-          siteId,
-          userId,
-        ]);
-
-        if ((siteCheck?.rowCount || 0) === 0) {
-          return errorResponse("Unauthorized: Site does not belong to user.", { data: null });
-        }
-
         const [
           uniqueVisitorsResult,
           totalVisitsResult,
@@ -90,46 +81,46 @@ export const siteResolvers = {
         ] = await Promise.all([
           pool.query(
             `SELECT COUNT(DISTINCT session_id) AS count
-         FROM visits
-         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+             FROM visits
+             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
           pool.query(
             `SELECT COUNT(*) AS count
-         FROM visits
-         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+             FROM visits
+             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
           pool.query(
             `SELECT CASE
-           WHEN COUNT(DISTINCT session_id) = 0 THEN 0
-           ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
-         END AS value
-         FROM visits
-         WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+               WHEN COUNT(DISTINCT session_id) = 0 THEN 0
+               ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
+             END AS value
+             FROM visits
+             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
           pool.query(
             `SELECT CASE
-           WHEN COUNT(*) = 0 THEN 0
-           ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
-         END AS value
-         FROM (
-           SELECT session_id, COUNT(*) AS visit_count
-           FROM visits
-           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-           GROUP BY session_id
-         ) sub`,
+               WHEN COUNT(*) = 0 THEN 0
+               ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
+             END AS value
+             FROM (
+               SELECT session_id, COUNT(*) AS visit_count
+               FROM visits
+               WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+               GROUP BY session_id
+             ) sub`,
             [siteId, startAt, endAt]
           ),
           pool.query(
             `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
-         FROM (
-           SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
-           FROM visits
-           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-           GROUP BY session_id
-         ) sub`,
+             FROM (
+               SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
+               FROM visits
+               WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+               GROUP BY session_id
+             ) sub`,
             [siteId, startAt, endAt]
           ),
         ]);
@@ -145,6 +136,62 @@ export const siteResolvers = {
       } catch (error) {
         console.error("Error in siteKPIStats:", error);
         return errorResponse("Failed to fetch site KPI stats.", { data: null });
+      }
+    },
+
+    siteLiveStats: async (_: any, args: { siteId: string }, context: any) => {
+      const auth = assertAuthenticated(context);
+      if (!auth.success) return auth;
+
+      const privilegeCheck = await assertUserOwnsSite(auth.userId, args.siteId);
+      if (!privilegeCheck.success) return privilegeCheck;
+
+      const { siteId } = args;
+
+      try {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+        const [liveUsersResult, activePagesResult, liveEventsResult] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(DISTINCT session_id) AS count
+             FROM visits
+             WHERE site_id = $1 AND created_at >= $2`,
+            [siteId, fiveMinutesAgo]
+          ),
+          pool.query(
+            `SELECT url AS path, COUNT(*) AS count
+             FROM visits
+             WHERE site_id = $1 AND created_at >= $2
+             GROUP BY url
+             ORDER BY count DESC
+             LIMIT 10`,
+            [siteId, fiveMinutesAgo]
+          ),
+          pool.query(
+            `SELECT name, COUNT(*) AS count
+             FROM events
+             WHERE site_id = $1 AND created_at >= $2
+             GROUP BY name
+             ORDER BY count DESC
+             LIMIT 10`,
+            [siteId, fiveMinutesAgo]
+          ),
+        ]);
+
+        return successResponse("Live site stats fetched", {
+          liveUsers: parseInt(liveUsersResult.rows[0].count || "0"),
+          activePages: activePagesResult.rows.map((row) => ({
+            path: row.path,
+            count: parseInt(row.count),
+          })),
+          liveEvents: liveEventsResult.rows.map((row) => ({
+            name: row.name,
+            count: parseInt(row.count),
+          })),
+        });
+      } catch (error) {
+        console.error("Error in siteLiveStats:", error);
+        return errorResponse("Failed to fetch live stats.", { data: null });
       }
     },
   },
