@@ -25,6 +25,9 @@ export const siteTypeDefs = gql`
     liveUsers: Int!
     activePages: [PageActivity!]!
     liveEvents: [EventActivity!]!
+    avgDailyUsers: Int!
+    avgWeeklyUsers: Int!
+    avgMonthlyUsers: Int!
   }
 
   type PageActivity {

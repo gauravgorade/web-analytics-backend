@@ -149,34 +149,53 @@ export const siteResolvers = {
       const { siteId } = args;
 
       try {
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
 
-        const [liveUsersResult, activePagesResult, liveEventsResult] = await Promise.all([
-          pool.query(
-            `SELECT COUNT(DISTINCT session_id) AS count
-             FROM visits
-             WHERE site_id = $1 AND created_at >= $2`,
-            [siteId, fiveMinutesAgo]
-          ),
-          pool.query(
-            `SELECT url AS path, COUNT(*) AS count
-             FROM visits
-             WHERE site_id = $1 AND created_at >= $2
-             GROUP BY url
-             ORDER BY count DESC
-             LIMIT 10`,
-            [siteId, fiveMinutesAgo]
-          ),
-          pool.query(
-            `SELECT name, COUNT(*) AS count
-             FROM events
-             WHERE site_id = $1 AND created_at >= $2
-             GROUP BY name
-             ORDER BY count DESC
-             LIMIT 10`,
-            [siteId, fiveMinutesAgo]
-          ),
-        ]);
+        const startOfDay = new Date(now);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setUTCDate(now.getUTCDate() - 30);
+
+        const [liveUsersResult, activePagesResult, liveEventsResult, avgUsersResult] =
+          await Promise.all([
+            pool.query(
+              `SELECT COUNT(DISTINCT session_id) AS count
+           FROM visits
+           WHERE site_id = $1 AND created_at >= $2`,
+              [siteId, fiveMinutesAgo]
+            ),
+            pool.query(
+              `SELECT url AS path, COUNT(*) AS count
+           FROM visits
+           WHERE site_id = $1 AND created_at >= $2
+           GROUP BY url
+           ORDER BY count DESC
+           LIMIT 10`,
+              [siteId, fiveMinutesAgo]
+            ),
+            pool.query(
+              `SELECT name, COUNT(*) AS count
+           FROM events
+           WHERE site_id = $1 AND created_at >= $2
+           GROUP BY name
+           ORDER BY count DESC
+           LIMIT 10`,
+              [siteId, fiveMinutesAgo]
+            ),
+            pool.query(
+              `SELECT
+              COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' THEN session_id END) AS daily,
+              COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN session_id END) / 7 AS weekly,
+              COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN session_id END) / 30 AS monthly
+           FROM visits
+           WHERE site_id = $1`,
+              [siteId]
+            ),
+          ]);
+
+        const avg = avgUsersResult.rows[0];
 
         return successResponse("Live site stats fetched", {
           liveUsers: parseInt(liveUsersResult.rows[0].count || "0"),
@@ -188,6 +207,9 @@ export const siteResolvers = {
             name: row.name,
             count: parseInt(row.count),
           })),
+          avgDailyUsers: Math.round(avg.daily || 0),
+          avgWeeklyUsers: Math.round(avg.weekly || 0),
+          avgMonthlyUsers: Math.round(avg.monthly || 0),
         });
       } catch (error) {
         console.error("Error in siteLiveStats:", error);
