@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
+import { pool } from "../db";
 import { config } from "../config";
+import { errorResponse } from "../utils/response";
 
 export function getUserIdFromRequest(req: any): string | null {
   const authHeader = req.headers.authorization;
@@ -12,4 +14,25 @@ export function getUserIdFromRequest(req: any): string | null {
     console.error("Invalid token:", err);
     return null;
   }
+}
+
+export async function assertUserOwnsSite(userId: string, siteId: string) {
+  const result = await pool.query(`SELECT 1 FROM sites WHERE id = $1 AND user_id = $2`, [
+    siteId,
+    userId,
+  ]);
+
+  if (result.rowCount === 0) {
+    return errorResponse("Unauthorized: Site does not belong to user.");
+  }
+
+  return { success: true };
+}
+
+export function assertAuthenticated(context: { userId?: string }) {
+  if (!context.userId) {
+    return errorResponse("Unauthorized: User not authenticated.");
+  }
+
+  return { success: true, userId: context.userId };
 }

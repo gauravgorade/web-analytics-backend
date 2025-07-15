@@ -2,20 +2,17 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { pool } from "../../db";
 import { config } from "../../config";
+import { successResponse, errorResponse } from "../../utils";
 
 export const userResolvers = {
   Mutation: {
-    createUserWithHash: async (_query: any, args: any) => {
+    createUserWithHash: async (_: any, args: any) => {
       const { name, email, password } = args.input;
 
       try {
         const existing = await pool.query(`SELECT id FROM users WHERE email = $1`, [email]);
-        if (existing.rows.length > 0) {
-          return {
-            success: false,
-            message: "Email already exists",
-            user: null,
-          };
+        if ((existing?.rowCount ?? 0) > 0) {
+          return errorResponse("Email already exists", null);
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -34,21 +31,16 @@ export const userResolvers = {
           dateFormat: result.rows[0].date_format,
         };
 
-        return {
-          success: true,
-          message: "User created successfully",
-          user,
-        };
+        return successResponse("User created successfully", user);
       } catch (error) {
-        return {
-          success: false,
-          message: error instanceof Error ? error.message : "Something went wrong",
-          user: null,
-        };
+        return errorResponse(
+          error instanceof Error ? error.message : "Something went wrong",
+          null
+        );
       }
     },
 
-    login: async (_query: any, args: any) => {
+    login: async (_: any, args: any) => {
       const { email, password } = args.input;
 
       try {
@@ -59,22 +51,12 @@ export const userResolvers = {
 
         const user = result.rows[0];
         if (!user) {
-          return {
-            success: false,
-            message: "Invalid credentials",
-            token: "",
-            user: null,
-          };
+          return errorResponse("Invalid credentials", null);
         }
 
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) {
-          return {
-            success: false,
-            message: "Invalid credentials",
-            token: "",
-            user: null,
-          };
+          return errorResponse("Invalid credentials", null);
         }
 
         const siteRes = await pool.query(
@@ -93,9 +75,7 @@ export const userResolvers = {
           expiresIn: "7d",
         });
 
-        return {
-          success: true,
-          message: "Login successful",
+        return successResponse("Login successful", {
           token,
           user: {
             name: user.name,
@@ -104,16 +84,13 @@ export const userResolvers = {
             dateFormat: user.date_format,
             sites,
           },
-        };
+        });
       } catch (error) {
-        return {
-          success: false,
-          message: error instanceof Error ? error.message : "Something went wrong",
-          token: "",
-          user: null,
-        };
+        return errorResponse(
+          error instanceof Error ? error.message : "Something went wrong",
+          null
+        );
       }
     },
   },
 };
-

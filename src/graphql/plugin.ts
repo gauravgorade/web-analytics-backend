@@ -1,11 +1,11 @@
 import { makeExtendSchemaPlugin } from "postgraphile";
-import { userTypeDefs, siteTypeDefs } from "./typeDefs";
+import { userTypeDefs, siteTypeDefs, commonTypes } from "./typeDefs";
 import { userResolvers, siteResolvers } from "./resolvers";
 
 export const customPlugin = makeExtendSchemaPlugin(() => ({
-  typeDefs: [userTypeDefs,siteTypeDefs],
+  typeDefs: [commonTypes, userTypeDefs, siteTypeDefs],
   resolvers: {
-     Query: {
+    Query: {
       ...siteResolvers.Query,
     },
     Mutation: {

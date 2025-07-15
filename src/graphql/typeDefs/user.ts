@@ -1,47 +1,51 @@
 import { gql } from "postgraphile";
 
 export const userTypeDefs = gql`
-  input CustomCreateUserInput {
+  input CreateUserInput {
     name: String!
     email: String!
     password: String!
   }
 
-  input LoginUserInput {
+  input LoginInput {
     email: String!
     password: String!
   }
 
-  type CustomCreateUserPayload {
+  type UserPayload {
     name: String!
     email: String!
     timezone: String!
     dateFormat: String!
   }
 
-  type CustomLoginUserPayload {
+  type LoginUserPayload {
     name: String!
     email: String!
     timezone: String!
     dateFormat: String!
-    sites: [CustomCreateSitePayload!]!
+    sites: [SitePayload!]!
   }
 
-  type CreateUserWithHashResponse {
-    success: Boolean!
-    message: String
-    user: CustomCreateUserPayload
-  }
-
-  type LoginUserResponse {
-    success: Boolean!
-    message: String
+  type LoginResponsePayload {
     token: String!
-    user: CustomLoginUserPayload
+    user: LoginUserPayload!
+  }
+
+  type CreateUserResponse implements MutationResponse {
+    success: Boolean!
+    message: String!
+    data: UserPayload
+  }
+
+  type LoginResponse implements MutationResponse {
+    success: Boolean!
+    message: String!
+    data: LoginResponsePayload
   }
 
   extend type Mutation {
-    createUserWithHash(input: CustomCreateUserInput!): CreateUserWithHashResponse
-    login(input: LoginUserInput!): LoginUserResponse
+    createUserWithHash(input: CreateUserInput!): CreateUserResponse
+    login(input: LoginInput!): LoginResponse
   }
 `;
