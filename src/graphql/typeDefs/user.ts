@@ -1,7 +1,7 @@
 import { gql } from "postgraphile";
 
 export const userTypeDefs = gql`
-  input CreateUserInput {
+  input AddUserInput {
     name: String!
     email: String!
     password: String!
@@ -32,7 +32,7 @@ export const userTypeDefs = gql`
     user: LoginUserPayload!
   }
 
-  type CreateUserResponse implements MutationResponse {
+  type AddUserResponse implements MutationResponse {
     success: Boolean!
     message: String!
     data: UserPayload
@@ -45,7 +45,7 @@ export const userTypeDefs = gql`
   }
 
   extend type Mutation {
-    createUserWithHash(input: CreateUserInput!): CreateUserResponse
+    addUserWithHash(input: AddUserInput!): AddUserResponse
     login(input: LoginInput!): LoginResponse
   }
 `;

@@ -6,7 +6,7 @@ import { successResponse, errorResponse } from "../../utils";
 
 export const userResolvers = {
   Mutation: {
-    createUserWithHash: async (_: any, args: any) => {
+    addUserWithHash: async (_: any, args: any) => {
       const { name, email, password } = args.input;
 
       try {
