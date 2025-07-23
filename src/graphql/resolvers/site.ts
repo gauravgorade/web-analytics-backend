@@ -209,7 +209,7 @@ export const siteResolvers = {
           `SELECT 
             TO_CHAR(created_at, $1) AS date_grouping,
             COUNT(DISTINCT session_id) AS visitors,
-            COUNT(*) AS pageviews
+            COUNT(url) AS pageviews
           FROM visits
           WHERE site_id = $2 AND created_at BETWEEN $3 AND $4
           GROUP BY date_grouping
@@ -225,35 +225,27 @@ export const siteResolvers = {
           };
         });
 
-        console.log('rawData',rawData)
+        const start = dayjs.utc(startAt);
+        const end = dayjs.utc(endAt);
+        const unit: dayjs.ManipulateType =
+          dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year";
 
-        const start = dayjs(startAt);
-        const end = dayjs(endAt);
         const finalData: {
           dateGrouping: string;
           visitors: number;
           pageviews: number;
         }[] = [];
 
-        let cursor = start.startOf(
-          dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year"
-        );
+        let cursor = start.startOf(unit);
 
-        while (
-          cursor.isBefore(end) ||
-          cursor.isSame(end, dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year")
-        ) {
+        while (cursor.isSameOrBefore(end, unit)) {
           const key = cursor.format(outputFormat);
           finalData.push({
-            dateGrouping: cursor.format(outputFormat),
+            dateGrouping: key,
             visitors: rawData[key]?.visitors || 0,
             pageviews: rawData[key]?.pageviews || 0,
           });
-
-          cursor = cursor.add(
-            1,
-            dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year"
-          );
+          cursor = cursor.add(1, unit);
         }
 
         return {
