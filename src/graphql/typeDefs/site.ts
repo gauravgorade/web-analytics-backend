@@ -5,13 +5,6 @@ export const siteTypeDefs = gql`
     domain: String!
   }
 
-  input TrafficStatsInput {
-    siteId: UUID!
-    startAt: String!
-    endAt: String!
-    dateGrouping: String!
-  }
-
   type TrafficPayload {
     dateGrouping: String!
     visitors: Int!
@@ -72,6 +65,6 @@ export const siteTypeDefs = gql`
   extend type Query {
     siteLiveStats(siteId: UUID!): SiteLiveStatsResponse!
     siteKPIStats(siteId: UUID!, startAt: String!, endAt: String!): SiteKPIStatsResponse!
-    siteTrafficStats(input: TrafficStatsInput!): TrafficStatsResponse!
+    siteTrafficStats(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficStatsResponse!
   }
 `;
