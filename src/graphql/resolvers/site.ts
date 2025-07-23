@@ -359,6 +359,18 @@ export const siteResolvers = {
 
         const { siteId, startAt, endAt } = args;
 
+        const siteResult = await pool.query(`SELECT domain FROM sites WHERE id = $1`, [siteId]);
+
+        if (siteResult.rowCount === 0) {
+          return {
+            success: false,
+            message: "Site not found.",
+            data: [],
+          };
+        }
+
+        const domain = siteResult.rows[0].domain; // e.g., "gauravgorade.github.io"
+
         const result = await pool.query(
           `SELECT 
             COALESCE(NULLIF(SPLIT_PART(referrer, '/', 3), ''), 'Direct') AS source,
@@ -366,10 +378,15 @@ export const siteResolvers = {
           FROM visits
           WHERE site_id = $1
             AND created_at BETWEEN $2 AND $3
+            AND (
+              referrer IS NULL OR 
+              referrer = '' OR 
+              SPLIT_PART(referrer, '/', 3) IS DISTINCT FROM $4
+            )
           GROUP BY source
           ORDER BY visitors DESC
           LIMIT 20`,
-          [siteId, startAt, endAt]
+          [siteId, startAt, endAt, domain]
         );
 
         return {
