@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { pool } from "../../db";
 import { successResponse, errorResponse } from "../../utils/response";
-import { assertAuthenticated, assertUserOwnsSite } from "../../utils";
+import { assertAuthenticated, assertUserOwnsSite, authorizeSiteAccess, dayjs } from "../../utils";
 
 export const siteResolvers = {
   Mutation: {
@@ -63,11 +63,8 @@ export const siteResolvers = {
       args: { siteId: string; startAt: string; endAt: string },
       context: any
     ) => {
-      const auth = assertAuthenticated(context);
+      const auth = await authorizeSiteAccess(context, args.siteId);
       if (!auth.success) return auth;
-
-      const privilegeCheck = await assertUserOwnsSite(auth.userId, args.siteId);
-      if (!privilegeCheck.success) return privilegeCheck;
 
       const { siteId, startAt, endAt } = args;
 
@@ -140,73 +137,37 @@ export const siteResolvers = {
     },
 
     siteLiveStats: async (_: any, args: { siteId: string }, context: any) => {
-      const auth = assertAuthenticated(context);
+      const auth = await authorizeSiteAccess(context, args.siteId);
       if (!auth.success) return auth;
-
-      const privilegeCheck = await assertUserOwnsSite(auth.userId, args.siteId);
-      if (!privilegeCheck.success) return privilegeCheck;
 
       const { siteId } = args;
 
       try {
-        const now = new Date();
-        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+        const now = dayjs().utc();
+        const fiveMinutesAgo = now.subtract(5, "minute").toISOString();
 
-        const startOfDay = new Date(now);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-
-        const thirtyDaysAgo = new Date(now);
-        thirtyDaysAgo.setUTCDate(now.getUTCDate() - 30);
-
-        const [liveUsersResult, activePagesResult, liveEventsResult, avgUsersResult] =
-          await Promise.all([
-            pool.query(
-              `SELECT COUNT(DISTINCT session_id) AS count
-           FROM visits
-           WHERE site_id = $1 AND created_at >= $2`,
-              [siteId, fiveMinutesAgo]
-            ),
-            pool.query(
-              `SELECT url AS path, COUNT(*) AS count
-           FROM visits
-           WHERE site_id = $1 AND created_at >= $2
-           GROUP BY url
-           ORDER BY count DESC
-           LIMIT 10`,
-              [siteId, fiveMinutesAgo]
-            ),
-            pool.query(
-              `SELECT name, COUNT(*) AS count
-           FROM events
-           WHERE site_id = $1 AND created_at >= $2
-           GROUP BY name
-           ORDER BY count DESC
-           LIMIT 10`,
-              [siteId, fiveMinutesAgo]
-            ),
-            pool.query(
-              `SELECT
+        const [liveUsersResult, avgUsersResult] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(DISTINCT session_id) AS count
+             FROM visits
+             WHERE site_id = $1 AND created_at >= $2`,
+            [siteId, fiveMinutesAgo]
+          ),
+          pool.query(
+            `SELECT
               COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' THEN session_id END) AS daily,
               COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN session_id END) / 7 AS weekly,
               COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN session_id END) / 30 AS monthly
-           FROM visits
-           WHERE site_id = $1`,
-              [siteId]
-            ),
-          ]);
+             FROM visits
+             WHERE site_id = $1`,
+            [siteId]
+          ),
+        ]);
 
         const avg = avgUsersResult.rows[0];
 
         return successResponse("Live site stats fetched", {
           liveUsers: parseInt(liveUsersResult.rows[0].count || "0"),
-          activePages: activePagesResult.rows.map((row) => ({
-            path: row.path,
-            count: parseInt(row.count),
-          })),
-          liveEvents: liveEventsResult.rows.map((row) => ({
-            name: row.name,
-            count: parseInt(row.count),
-          })),
           avgDailyUsers: Math.round(avg.daily || 0),
           avgWeeklyUsers: Math.round(avg.weekly || 0),
           avgMonthlyUsers: Math.round(avg.monthly || 0),

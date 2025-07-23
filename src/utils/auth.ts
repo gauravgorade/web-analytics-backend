@@ -42,3 +42,13 @@ export function assertAuthenticated(context: { userId?: string }): AuthSuccess |
 
   return { success: true, userId: context.userId };
 }
+
+export async function authorizeSiteAccess(context: any, siteId: string) {
+  const auth = assertAuthenticated(context);
+  if (!auth.success) return auth;
+
+  const privilegeCheck = await assertUserOwnsSite(auth.userId, siteId);
+  if (!privilegeCheck.success) return privilegeCheck;
+
+  return { success: true, userId: auth.userId };
+}

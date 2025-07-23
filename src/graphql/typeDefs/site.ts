@@ -23,21 +23,9 @@ export const siteTypeDefs = gql`
 
   type LiveStats {
     liveUsers: Int!
-    activePages: [PageActivity!]!
-    liveEvents: [EventActivity!]!
     avgDailyUsers: Int!
     avgWeeklyUsers: Int!
     avgMonthlyUsers: Int!
-  }
-
-  type PageActivity {
-    path: String!
-    count: Int!
-  }
-
-  type EventActivity {
-    name: String!
-    count: Int!
   }
 
   type AddSiteResponse implements MutationResponse {

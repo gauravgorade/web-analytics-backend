@@ -9,7 +9,7 @@
 
   const SESSION_ID_KEY = "_putlerwa_session_id";
   const LAST_ACTIVITY_KEY = "_putlerwa_last_activity";
-  const SESSION_TIMEOUT_MINUTES = 15;
+  const SESSION_TIMEOUT_MINUTES = 5;
   const timeoutDuration = SESSION_TIMEOUT_MINUTES * 60 * 1000;
 
   const now = () => Date.now();
