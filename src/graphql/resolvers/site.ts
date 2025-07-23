@@ -204,7 +204,7 @@ export const siteResolvers = {
       if (!allowedFormats.includes(rawDateFormat)) {
         return {
           success: false,
-          message: "Invalid date format.",
+          message: "Invalid dateGrouping format.",
           data: [],
         };
       }
@@ -225,7 +225,7 @@ export const siteResolvers = {
         return {
           success: true,
           message: "Traffic stats fetched successfully.",
-          data: trafficData.rows,
+          data: trafficData.rows || [],
         };
       } catch (err) {
         console.error("Error in siteTrafficStats:", err);

@@ -13,7 +13,7 @@ export const siteTypeDefs = gql`
   }
 
   type TrafficPayload {
-    date: String!
+    dateGrouping: String!
     visitors: Int!
     pageviews: Int!
   }
