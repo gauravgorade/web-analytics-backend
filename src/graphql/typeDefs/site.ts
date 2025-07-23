@@ -18,7 +18,7 @@ export const siteTypeDefs = gql`
     createdAt: String!
   }
 
-  type SiteKPIStats {
+  type SiteKPISummaryPayload {
     uniqueVisitors: Int!
     totalVisits: Int!
     totalPageviews: Int!
@@ -27,7 +27,7 @@ export const siteTypeDefs = gql`
     averageVisitDuration: Float!
   }
 
-  type LiveStats {
+  type LiveStatsPayload {
     liveUsers: Int!
     avgDailyUsers: Int!
     avgWeeklyUsers: Int!
@@ -40,19 +40,19 @@ export const siteTypeDefs = gql`
     data: SitePayload
   }
 
-  type SiteKPIStatsResponse implements QueryResponse {
+  type SiteKPISummaryResponse implements QueryResponse {
     success: Boolean!
     message: String!
-    data: SiteKPIStats
+    data: SiteKPISummaryPayload
   }
 
   type SiteLiveStatsResponse implements QueryResponse {
     success: Boolean!
     message: String!
-    data: LiveStats
+    data: LiveStatsPayload
   }
 
-  type TrafficStatsResponse implements QueryResponse {
+  type TrafficTrendsResponse implements QueryResponse {
     success: Boolean!
     message: String!
     data: [TrafficPayload!]!
@@ -64,7 +64,7 @@ export const siteTypeDefs = gql`
 
   extend type Query {
     siteLiveStats(siteId: UUID!): SiteLiveStatsResponse!
-    siteKPIStats(siteId: UUID!, startAt: String!, endAt: String!): SiteKPIStatsResponse!
-    siteTrafficStats(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficStatsResponse!
+    siteKPISummary(siteId: UUID!, startAt: String!, endAt: String!): SiteKPISummaryResponse!
+    siteTrafficTrends(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficTrendsResponse!
   }
 `;

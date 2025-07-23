@@ -106,7 +106,8 @@ export const siteResolvers = {
         return errorResponse("Failed to fetch live stats.", { data: null });
       }
     },
-    siteKPIStats: async (
+
+    siteKPISummary: async (
       _: any,
       args: { siteId: string; startAt: string; endAt: string },
       context: any
@@ -183,8 +184,8 @@ export const siteResolvers = {
         return errorResponse("Failed to fetch site KPI stats.", { data: null });
       }
     },
-
-    siteTrafficStats: async (
+    
+    siteTrafficTrends: async (
       _: any,
       args: { siteId: string; startAt: string; endAt: string; dateGrouping: "d" | "m" | "y" },
       context: any
