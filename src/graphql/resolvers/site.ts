@@ -100,15 +100,16 @@ export const siteResolvers = {
               GROUP BY DATE_TRUNC('day', created_at)
             ) AS daily_counts
           ) AS monthly
-        `,
+        FROM visits
+        WHERE site_id = $1`,
             [siteId, startOfToday, startOf7DaysAgo, startOf30DaysAgo]
           ),
         ]);
 
-        const avg = avgUsersResult.rows[0];
+        const avg = avgUsersResult.rows[0] || {};
 
         return successResponse("Live site stats fetched", {
-          liveUsers: parseInt(liveUsersResult.rows[0].count || "0"),
+          liveUsers: parseInt(liveUsersResult.rows[0]?.count || "0"),
           avgDailyUsers: Math.round(avg.daily || 0),
           avgWeeklyUsers: Math.round(avg.weekly || 0),
           avgMonthlyUsers: Math.round(avg.monthly || 0),
