@@ -225,6 +225,8 @@ export const siteResolvers = {
           };
         });
 
+        console.log('rawData',rawData)
+
         const start = dayjs(startAt);
         const end = dayjs(endAt);
         const finalData: {
