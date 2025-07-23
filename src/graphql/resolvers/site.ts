@@ -215,8 +215,16 @@ export const siteResolvers = {
 
       const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
 
-      const outputFormat =
-        dateGrouping === "d" ? userDateFormat : dateGrouping === "m" ? "MM/YYYY" : "YYYY";
+      let outputFormat = "YYYY"; 
+      if (dateGrouping === "d") {
+        outputFormat = userDateFormat;
+      } else if (dateGrouping === "m") {
+        if (userDateFormat.startsWith("YYYY")) {
+          outputFormat = "YYYY/MM";
+        } else {
+          outputFormat = "MM/YYYY";
+        }
+      }
 
       try {
         const result = await pool.query(
