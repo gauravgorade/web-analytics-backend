@@ -190,7 +190,12 @@ export const siteResolvers = {
       context: any
     ) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
-      if (!auth.success) return auth;
+      if (!auth.success) {
+        return {
+          ...auth,
+          data: [],
+        };
+      }
 
       const { siteId, startAt, endAt, dateGrouping } = args;
 
@@ -198,7 +203,8 @@ export const siteResolvers = {
       const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
 
       // Choose raw format based on groupBy
-      const rawDateFormat = dateGrouping === "d" ? userDateFormat : dateGrouping === "m" ? "YYYY-MM" : "YYYY";
+      const rawDateFormat =
+        dateGrouping === "d" ? userDateFormat : dateGrouping === "m" ? "YYYY-MM" : "YYYY";
 
       const allowedFormats = ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM", "YYYY"];
       if (!allowedFormats.includes(rawDateFormat)) {
@@ -225,7 +231,7 @@ export const siteResolvers = {
         return {
           success: true,
           message: "Traffic stats fetched successfully.",
-          data: trafficData.rows || [],
+          data: Array.isArray(trafficData.rows) ? trafficData.rows : [],
         };
       } catch (err) {
         console.error("Error in siteTrafficStats:", err);
