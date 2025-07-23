@@ -143,24 +143,31 @@ export const siteResolvers = {
       const { siteId } = args;
 
       try {
-        const now = dayjs().utc();
-        const fiveMinutesAgo = now.subtract(5, "minute").toISOString();
+        const userTimezone = context.user?.timezone || "UTC";
+
+        // Current time in user's timezone, converted to UTC for DB filtering
+        const now = dayjs().tz(userTimezone);
+        const fiveMinutesAgo = now.subtract(5, "minute").utc().toISOString();
+
+        const startOfToday = now.startOf("day").utc().toISOString();
+        const startOf7DaysAgo = now.subtract(7, "days").startOf("day").utc().toISOString();
+        const startOf30DaysAgo = now.subtract(30, "days").startOf("day").utc().toISOString();
 
         const [liveUsersResult, avgUsersResult] = await Promise.all([
           pool.query(
             `SELECT COUNT(DISTINCT session_id) AS count
-             FROM visits
-             WHERE site_id = $1 AND created_at >= $2`,
+         FROM visits
+         WHERE site_id = $1 AND created_at >= $2`,
             [siteId, fiveMinutesAgo]
           ),
           pool.query(
             `SELECT
-              COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' THEN session_id END) AS daily,
-              COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN session_id END) / 7 AS weekly,
-              COUNT(DISTINCT CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN session_id END) / 30 AS monthly
-             FROM visits
-             WHERE site_id = $1`,
-            [siteId]
+            COUNT(DISTINCT CASE WHEN created_at >= $2 THEN session_id END) AS daily,
+            COUNT(DISTINCT CASE WHEN created_at >= $3 THEN session_id END) / 7 AS weekly,
+            COUNT(DISTINCT CASE WHEN created_at >= $4 THEN session_id END) / 30 AS monthly
+         FROM visits
+         WHERE site_id = $1`,
+            [siteId, startOfToday, startOf7DaysAgo, startOf30DaysAgo]
           ),
         ]);
 
