@@ -67,7 +67,6 @@ export const siteResolvers = {
       try {
         const userTimezone = context.user?.timezone || "UTC";
 
-        // Current time in user's timezone, converted to UTC for DB filtering
         const now = dayjs().tz(userTimezone);
         const fiveMinutesAgo = now.subtract(5, "minute").utc().toISOString();
 
@@ -84,11 +83,24 @@ export const siteResolvers = {
           ),
           pool.query(
             `SELECT
-            COUNT(DISTINCT CASE WHEN created_at >= $2 THEN session_id END) AS daily,
-            COUNT(DISTINCT CASE WHEN created_at >= $3 THEN session_id END) / 7 AS weekly,
-            COUNT(DISTINCT CASE WHEN created_at >= $4 THEN session_id END) / 30 AS monthly
-         FROM visits
-         WHERE site_id = $1`,
+          COUNT(DISTINCT CASE WHEN created_at >= $2 THEN session_id END) AS daily,
+          (
+            SELECT AVG(day_count) FROM (
+              SELECT COUNT(DISTINCT session_id) AS day_count
+              FROM visits
+              WHERE site_id = $1 AND created_at >= $3
+              GROUP BY DATE_TRUNC('day', created_at)
+            ) AS daily_counts
+          ) AS weekly,
+          (
+            SELECT AVG(day_count) FROM (
+              SELECT COUNT(DISTINCT session_id) AS day_count
+              FROM visits
+              WHERE site_id = $1 AND created_at >= $4
+              GROUP BY DATE_TRUNC('day', created_at)
+            ) AS daily_counts
+          ) AS monthly
+        `,
             [siteId, startOfToday, startOf7DaysAgo, startOf30DaysAgo]
           ),
         ]);
@@ -184,7 +196,7 @@ export const siteResolvers = {
         return errorResponse("Failed to fetch site KPI stats.", { data: null });
       }
     },
-    
+
     siteTrafficTrends: async (
       _: any,
       args: { siteId: string; startAt: string; endAt: string; dateGrouping: "d" | "m" | "y" },
