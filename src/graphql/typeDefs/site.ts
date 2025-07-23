@@ -5,6 +5,19 @@ export const siteTypeDefs = gql`
     domain: String!
   }
 
+  input TrafficStatsInput {
+    siteId: UUID!
+    startAt: String!
+    endAt: String!
+    dateGrouping: String!
+  }
+
+  type TrafficPayload {
+    date: String!
+    visitors: Int!
+    pageviews: Int!
+  }
+
   type SitePayload {
     id: UUID!
     domain: String!
@@ -46,12 +59,19 @@ export const siteTypeDefs = gql`
     data: LiveStats
   }
 
+  type TrafficStatsResponse implements QueryResponse {
+    success: Boolean!
+    message: String!
+    data: [TrafficPayload!]!
+  }
+
   extend type Mutation {
     addSite(input: AddSiteInput!): AddSiteResponse
   }
 
   extend type Query {
-    siteKPIStats(siteId: UUID!, startAt: String!, endAt: String!): SiteKPIStatsResponse!
     siteLiveStats(siteId: UUID!): SiteLiveStatsResponse!
+    siteKPIStats(siteId: UUID!, startAt: String!, endAt: String!): SiteKPIStatsResponse!
+    siteTrafficStats(input: TrafficStatsInput!): TrafficStatsResponse!
   }
 `;

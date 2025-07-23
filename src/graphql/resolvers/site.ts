@@ -58,6 +58,54 @@ export const siteResolvers = {
   },
 
   Query: {
+    siteLiveStats: async (_: any, args: { siteId: string }, context: any) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success) return auth;
+
+      const { siteId } = args;
+
+      try {
+        const userTimezone = context.user?.timezone || "UTC";
+
+        // Current time in user's timezone, converted to UTC for DB filtering
+        const now = dayjs().tz(userTimezone);
+        const fiveMinutesAgo = now.subtract(5, "minute").utc().toISOString();
+
+        const startOfToday = now.startOf("day").utc().toISOString();
+        const startOf7DaysAgo = now.subtract(7, "days").startOf("day").utc().toISOString();
+        const startOf30DaysAgo = now.subtract(30, "days").startOf("day").utc().toISOString();
+
+        const [liveUsersResult, avgUsersResult] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(DISTINCT session_id) AS count
+         FROM visits
+         WHERE site_id = $1 AND created_at >= $2`,
+            [siteId, fiveMinutesAgo]
+          ),
+          pool.query(
+            `SELECT
+            COUNT(DISTINCT CASE WHEN created_at >= $2 THEN session_id END) AS daily,
+            COUNT(DISTINCT CASE WHEN created_at >= $3 THEN session_id END) / 7 AS weekly,
+            COUNT(DISTINCT CASE WHEN created_at >= $4 THEN session_id END) / 30 AS monthly
+         FROM visits
+         WHERE site_id = $1`,
+            [siteId, startOfToday, startOf7DaysAgo, startOf30DaysAgo]
+          ),
+        ]);
+
+        const avg = avgUsersResult.rows[0];
+
+        return successResponse("Live site stats fetched", {
+          liveUsers: parseInt(liveUsersResult.rows[0].count || "0"),
+          avgDailyUsers: Math.round(avg.daily || 0),
+          avgWeeklyUsers: Math.round(avg.weekly || 0),
+          avgMonthlyUsers: Math.round(avg.monthly || 0),
+        });
+      } catch (error) {
+        console.error("Error in siteLiveStats:", error);
+        return errorResponse("Failed to fetch live stats.", { data: null });
+      }
+    },
     siteKPIStats: async (
       _: any,
       args: { siteId: string; startAt: string; endAt: string },
@@ -136,52 +184,56 @@ export const siteResolvers = {
       }
     },
 
-    siteLiveStats: async (_: any, args: { siteId: string }, context: any) => {
+    siteTrafficStats: async (
+      _: any,
+      args: { siteId: string; startAt: string; endAt: string; dateGrouping: string },
+      context: any
+    ) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
       if (!auth.success) return auth;
 
-      const { siteId } = args;
+      const { siteId, startAt, endAt, dateGrouping } = args;
+
+      // Default date format from user or fallback
+      const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
+
+      // Choose raw format based on groupBy
+      const rawDateFormat = dateGrouping === "d" ? userDateFormat : dateGrouping === "m" ? "YYYY-MM" : "YYYY";
+
+      const allowedFormats = ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM", "YYYY"];
+      if (!allowedFormats.includes(rawDateFormat)) {
+        return {
+          success: false,
+          message: "Invalid date format.",
+          data: [],
+        };
+      }
 
       try {
-        const userTimezone = context.user?.timezone || "UTC";
+        const trafficData = await pool.query(
+          `SELECT 
+          TO_CHAR(created_at, '${rawDateFormat}') AS dateGrouping,
+          COUNT(DISTINCT session_id) AS visitors,
+          COUNT(*) AS pageviews
+        FROM visits
+        WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+        GROUP BY dateGrouping
+        ORDER BY dateGrouping ASC`,
+          [siteId, startAt, endAt]
+        );
 
-        // Current time in user's timezone, converted to UTC for DB filtering
-        const now = dayjs().tz(userTimezone);
-        const fiveMinutesAgo = now.subtract(5, "minute").utc().toISOString();
-
-        const startOfToday = now.startOf("day").utc().toISOString();
-        const startOf7DaysAgo = now.subtract(7, "days").startOf("day").utc().toISOString();
-        const startOf30DaysAgo = now.subtract(30, "days").startOf("day").utc().toISOString();
-
-        const [liveUsersResult, avgUsersResult] = await Promise.all([
-          pool.query(
-            `SELECT COUNT(DISTINCT session_id) AS count
-         FROM visits
-         WHERE site_id = $1 AND created_at >= $2`,
-            [siteId, fiveMinutesAgo]
-          ),
-          pool.query(
-            `SELECT
-            COUNT(DISTINCT CASE WHEN created_at >= $2 THEN session_id END) AS daily,
-            COUNT(DISTINCT CASE WHEN created_at >= $3 THEN session_id END) / 7 AS weekly,
-            COUNT(DISTINCT CASE WHEN created_at >= $4 THEN session_id END) / 30 AS monthly
-         FROM visits
-         WHERE site_id = $1`,
-            [siteId, startOfToday, startOf7DaysAgo, startOf30DaysAgo]
-          ),
-        ]);
-
-        const avg = avgUsersResult.rows[0];
-
-        return successResponse("Live site stats fetched", {
-          liveUsers: parseInt(liveUsersResult.rows[0].count || "0"),
-          avgDailyUsers: Math.round(avg.daily || 0),
-          avgWeeklyUsers: Math.round(avg.weekly || 0),
-          avgMonthlyUsers: Math.round(avg.monthly || 0),
-        });
-      } catch (error) {
-        console.error("Error in siteLiveStats:", error);
-        return errorResponse("Failed to fetch live stats.", { data: null });
+        return {
+          success: true,
+          message: "Traffic stats fetched successfully.",
+          data: trafficData.rows,
+        };
+      } catch (err) {
+        console.error("Error in siteTrafficStats:", err);
+        return {
+          success: false,
+          message: "Failed to fetch traffic stats.",
+          data: [],
+        };
       }
     },
   },
