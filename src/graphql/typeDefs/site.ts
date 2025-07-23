@@ -11,6 +11,16 @@ export const siteTypeDefs = gql`
     pageviews: Int!
   }
 
+  type TopPagesPayload {
+    source: String!
+    visitors: Int!
+  }
+
+  type TopChannelsPayload {
+    source: String!
+    visitors: Int!
+  }
+
   type SitePayload {
     id: UUID!
     domain: String!
@@ -58,6 +68,17 @@ export const siteTypeDefs = gql`
     data: [TrafficPayload!]!
   }
 
+  type TopPagesResponse implements QueryResponse {
+    success: Boolean!
+    message: String!
+    data: [TopPagesPayload!]!
+  }
+  type TopChannelsResponse implements QueryResponse {
+    success: Boolean!
+    message: String!
+    data: [TopChannelsPayload!]!
+  }
+
   extend type Mutation {
     addSite(input: AddSiteInput!): AddSiteResponse
   }
@@ -66,5 +87,7 @@ export const siteTypeDefs = gql`
     siteLiveStats(siteId: UUID!): SiteLiveStatsResponse!
     siteKPISummary(siteId: UUID!, startAt: String!, endAt: String!): SiteKPISummaryResponse!
     siteTrafficTrends(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficTrendsResponse!
+    siteTopPages(siteId: UUID!, startAt: String!, endAt: String! ): TopPagesResponse!
+    siteTopChannels(siteId: UUID!, startAt: String!, endAt: String!): TopChannelsResponse!
   }
 `;

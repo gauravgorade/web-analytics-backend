@@ -215,7 +215,7 @@ export const siteResolvers = {
 
       const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
 
-      let outputFormat = "YYYY"; 
+      let outputFormat = "YYYY";
       if (dateGrouping === "d") {
         outputFormat = userDateFormat;
       } else if (dateGrouping === "m") {
@@ -280,6 +280,111 @@ export const siteResolvers = {
         return {
           success: false,
           message: "Failed to fetch traffic stats.",
+          data: [],
+        };
+      }
+    },
+
+    siteTopPages: async (
+      _: any,
+      args: { siteId: string; startAt: string; endAt: string },
+      context: any
+    ) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success) {
+        return {
+          ...auth,
+          data: [],
+        };
+      }
+
+      const { siteId, startAt, endAt } = args;
+
+      try {
+        const result = await pool.query(
+          `SELECT 
+            url,
+            COUNT(DISTINCT session_id) AS visitors
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+          GROUP BY url
+          ORDER BY visitors DESC
+          LIMIT 20`,
+          [siteId, startAt, endAt]
+        );
+
+        const data = result.rows.map((row) => {
+          try {
+            const { pathname } = new URL(row.url);
+            return {
+              source: pathname || "/",
+              visitors: Number(row.visitors),
+            };
+          } catch {
+            return {
+              source: row.url || "/",
+              visitors: Number(row.visitors),
+            };
+          }
+        });
+
+        return {
+          success: true,
+          message: "Top pages fetched successfully",
+          data,
+        };
+      } catch (error) {
+        console.error("Error in siteTopPages:", error);
+        return {
+          success: false,
+          message: "Failed to fetch top pages",
+          data: [],
+        };
+      }
+    },
+
+    siteTopChannels: async (
+      _: any,
+      args: { siteId: string; startAt: string; endAt: string },
+      context: any
+    ) => {
+      try {
+        const auth = await authorizeSiteAccess(context, args.siteId);
+        if (!auth.success) {
+          return {
+            ...auth,
+            data: [],
+          };
+        }
+
+        const { siteId, startAt, endAt } = args;
+
+        const result = await pool.query(
+          `SELECT 
+            COALESCE(NULLIF(SPLIT_PART(referrer, '/', 3), ''), 'Direct') AS source,
+            COUNT(DISTINCT session_id) AS visitors
+          FROM visits
+          WHERE site_id = $1
+            AND created_at BETWEEN $2 AND $3
+          GROUP BY source
+          ORDER BY visitors DESC
+          LIMIT 20`,
+          [siteId, startAt, endAt]
+        );
+
+        return {
+          success: true,
+          message: "Top channels fetched successfully.",
+          data: result.rows.map((row) => ({
+            source: row.source,
+            visitors: Number(row.visitors),
+          })),
+        };
+      } catch (error) {
+        console.error("Error in siteTopChannels:", error);
+        return {
+          success: false,
+          message: "Failed to fetch top channels.",
           data: [],
         };
       }
