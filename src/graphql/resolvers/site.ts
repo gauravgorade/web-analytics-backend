@@ -186,7 +186,7 @@ export const siteResolvers = {
 
     siteTrafficStats: async (
       _: any,
-      args: { siteId: string; startAt: string; endAt: string; dateGrouping: string },
+      args: { siteId: string; startAt: string; endAt: string; dateGrouping: "d" | "m" | "y" },
       context: any
     ) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
@@ -199,39 +199,65 @@ export const siteResolvers = {
 
       const { siteId, startAt, endAt, dateGrouping } = args;
 
-      // Default date format from user or fallback
       const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
 
-      // Choose raw format based on groupBy
-      const rawDateFormat =
-        dateGrouping === "d" ? userDateFormat : dateGrouping === "m" ? "YYYY-MM" : "YYYY";
-
-      const allowedFormats = ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM", "YYYY"];
-      if (!allowedFormats.includes(rawDateFormat)) {
-        return {
-          success: false,
-          message: "Invalid dateGrouping format.",
-          data: [],
-        };
-      }
+      const outputFormat =
+        dateGrouping === "d" ? userDateFormat : dateGrouping === "m" ? "MM-YYYY" : "YYYY";
 
       try {
-        const trafficData = await pool.query(
+        const result = await pool.query(
           `SELECT 
-          TO_CHAR(created_at, '${rawDateFormat}') AS dateGrouping,
-          COUNT(DISTINCT session_id) AS visitors,
-          COUNT(*) AS pageviews
-        FROM visits
-        WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-        GROUP BY dateGrouping
-        ORDER BY dateGrouping ASC`,
-          [siteId, startAt, endAt]
+            TO_CHAR(created_at, $1) AS date_grouping,
+            COUNT(DISTINCT session_id) AS visitors,
+            COUNT(*) AS pageviews
+          FROM visits
+          WHERE site_id = $2 AND created_at BETWEEN $3 AND $4
+          GROUP BY date_grouping
+          ORDER BY date_grouping ASC`,
+          [outputFormat, siteId, startAt, endAt]
         );
+
+        const rawData: Record<string, { visitors: number; pageviews: number }> = {};
+        result.rows.forEach((row: any) => {
+          rawData[row.date_grouping] = {
+            visitors: parseInt(row.visitors, 10),
+            pageviews: parseInt(row.pageviews, 10),
+          };
+        });
+
+        const start = dayjs(startAt);
+        const end = dayjs(endAt);
+        const finalData: {
+          dateGrouping: string;
+          visitors: number;
+          pageviews: number;
+        }[] = [];
+
+        let cursor = start.startOf(
+          dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year"
+        );
+
+        while (
+          cursor.isBefore(end) ||
+          cursor.isSame(end, dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year")
+        ) {
+          const key = cursor.format(outputFormat);
+          finalData.push({
+            dateGrouping: cursor.format(outputFormat),
+            visitors: rawData[key]?.visitors || 0,
+            pageviews: rawData[key]?.pageviews || 0,
+          });
+
+          cursor = cursor.add(
+            1,
+            dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year"
+          );
+        }
 
         return {
           success: true,
           message: "Traffic stats fetched successfully.",
-          data: Array.isArray(trafficData.rows) ? trafficData.rows : [],
+          data: finalData,
         };
       } catch (err) {
         console.error("Error in siteTrafficStats:", err);
