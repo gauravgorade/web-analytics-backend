@@ -406,5 +406,63 @@ export const siteResolvers = {
         };
       }
     },
+
+    sessionsByDevice: async (
+      _: any,
+      args: { siteId: string; startAt: string; endAt: string },
+      context: any
+    ) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success) return auth;
+
+      const { siteId, startAt, endAt } = args;
+
+      try {
+        const result = await pool.query(
+          `SELECT 
+             device_type,
+             COUNT(*) AS count
+          FROM visits
+          WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+          GROUP BY device_type`,
+          [siteId, startAt, endAt]
+        );
+
+        let desktop = 0;
+        let mobile = 0;
+        let tablet = 0;
+        let total = 0;
+
+        for (const row of result.rows) {
+          const type = row.device_type?.toLowerCase();
+          const count = Number(row.count);
+          total += count;
+
+          if (type === "desktop") desktop += count;
+          else if (type === "mobile") mobile += count;
+          else if (type === "tablet") tablet += count;
+        }
+
+        const getPercentage = (value: number) =>
+          total > 0 ? parseFloat(((value / total) * 100).toFixed(2)) : 0;
+
+        return {
+          success: true,
+          message: "Sessions by device (%) fetched successfully.",
+          data: {
+            desktop: getPercentage(desktop),
+            mobile: getPercentage(mobile),
+            tablet: getPercentage(tablet),
+          },
+        };
+      } catch (error) {
+        console.error("Error in sessionsByDevice:", error);
+        return {
+          success: false,
+          message: "Failed to fetch sessions by device.",
+          data: { desktop: 0, mobile: 0, tablet: 0 },
+        };
+      }
+    },
   },
 };

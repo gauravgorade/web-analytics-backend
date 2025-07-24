@@ -44,6 +44,12 @@ export const siteTypeDefs = gql`
     avgMonthlyUsers: Int!
   }
 
+  type SessionsByDevicePayload {
+    desktop: Float!
+    mobile: Float!
+    tablet: Float!
+  }
+
   type AddSiteResponse implements MutationResponse {
     success: Boolean!
     message: String!
@@ -73,10 +79,17 @@ export const siteTypeDefs = gql`
     message: String!
     data: [TopPagesPayload!]!
   }
+
   type TopChannelsResponse implements QueryResponse {
     success: Boolean!
     message: String!
     data: [TopChannelsPayload!]!
+  }
+
+  type SessionsByDeviceResponse implements QueryResponse {
+    success: Boolean!
+    message: String!
+    data: SessionsByDevicePayload
   }
 
   extend type Mutation {
@@ -89,5 +102,6 @@ export const siteTypeDefs = gql`
     siteTrafficTrends(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficTrendsResponse!
     siteTopPages(siteId: UUID!, startAt: String!, endAt: String! ): TopPagesResponse!
     siteTopChannels(siteId: UUID!, startAt: String!, endAt: String!): TopChannelsResponse!
+    sessionsByDevice(siteId: UUID!, startAt: String!, endAt: String!): SessionsByDeviceResponse!
   }
 `;
