@@ -50,6 +50,14 @@ export const siteTypeDefs = gql`
     tablet: Float!
   }
 
+  type AcquisitionChannelsTrendsPayload {
+    dateGrouping: String!
+    direct: Int!
+    organic: Int!
+    social: Int!
+    referral: Int!
+  }
+
   type AddSiteResponse implements MutationResponse {
     success: Boolean!
     message: String!
@@ -92,6 +100,12 @@ export const siteTypeDefs = gql`
     data: SessionsByDevicePayload
   }
 
+  type AcquisitionChannelsTrendsResponse implements QueryResponse {
+    success: Boolean!
+    message: String!
+    data: [AcquisitionChannelsTrendsPayload!]!
+  }
+
   extend type Mutation {
     addSite(input: AddSiteInput!): AddSiteResponse
   }
@@ -99,9 +113,20 @@ export const siteTypeDefs = gql`
   extend type Query {
     siteLiveStats(siteId: UUID!): SiteLiveStatsResponse!
     siteKPISummary(siteId: UUID!, startAt: String!, endAt: String!): SiteKPISummaryResponse!
-    siteTrafficTrends(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficTrendsResponse!
-    siteTopPages(siteId: UUID!, startAt: String!, endAt: String! ): TopPagesResponse!
+    siteTrafficTrends(
+      siteId: UUID!
+      startAt: String!
+      endAt: String!
+      dateGrouping: String!
+    ): TrafficTrendsResponse!
+    siteTopPages(siteId: UUID!, startAt: String!, endAt: String!): TopPagesResponse!
     siteTopChannels(siteId: UUID!, startAt: String!, endAt: String!): TopChannelsResponse!
     sessionsByDevice(siteId: UUID!, startAt: String!, endAt: String!): SessionsByDeviceResponse!
+    siteAcquisitionChannelsTrends(
+      siteId: UUID!
+      startAt: String!
+      endAt: String!
+      dateGrouping: String!
+    ): AcquisitionChannelsTrendsResponse!
   }
 `;

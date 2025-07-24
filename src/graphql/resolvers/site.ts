@@ -272,14 +272,14 @@ export const siteResolvers = {
 
         return {
           success: true,
-          message: "Traffic stats fetched successfully.",
+          message: "Traffic trends fetched successfully.",
           data: finalData,
         };
       } catch (err) {
-        console.error("Error in siteTrafficStats:", err);
+        console.error("Error in siteTrafficTrends:", err);
         return {
           success: false,
-          message: "Failed to fetch traffic stats.",
+          message: "Failed to fetch traffic trends.",
           data: [],
         };
       }
@@ -369,20 +369,19 @@ export const siteResolvers = {
           };
         }
 
-        const domain = siteResult.rows[0].domain; // e.g., "gauravgorade.github.io"
+        const domain = siteResult.rows[0].domain;
 
         const result = await pool.query(
           `SELECT 
-            COALESCE(NULLIF(SPLIT_PART(referrer, '/', 3), ''), 'Direct') AS source,
+            CASE
+              WHEN referrer = '' THEN 'Direct'
+              ELSE COALESCE(NULLIF(SPLIT_PART(referrer, '/', 3), ''), 'Direct')
+            END AS source,
             COUNT(DISTINCT session_id) AS visitors
           FROM visits
           WHERE site_id = $1
             AND created_at BETWEEN $2 AND $3
-            AND (
-              referrer IS NULL OR 
-              referrer = '' OR 
-              SPLIT_PART(referrer, '/', 3) IS DISTINCT FROM $4
-            )
+            AND SPLIT_PART(referrer, '/', 3) IS DISTINCT FROM $4
           GROUP BY source
           ORDER BY visitors DESC
           LIMIT 20`,
@@ -461,6 +460,118 @@ export const siteResolvers = {
           success: false,
           message: "Failed to fetch sessions by device.",
           data: { desktop: 0, mobile: 0, tablet: 0 },
+        };
+      }
+    },
+
+    siteAcquisitionChannelsTrends: async (
+      _: any,
+      args: { siteId: string; startAt: string; endAt: string; dateGrouping: "d" | "m" | "y" },
+      context: any
+    ) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success) {
+        return {
+          ...auth,
+          data: [],
+        };
+      }
+
+      const { siteId, startAt, endAt, dateGrouping } = args;
+
+      const siteResult = await pool.query(`SELECT domain FROM sites WHERE id = $1`, [siteId]);
+      if (siteResult.rowCount === 0) {
+        return {
+          success: false,
+          message: "Site not found.",
+          data: [],
+        };
+      }
+
+      const domain = siteResult.rows[0].domain;
+      const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
+
+      let outputFormat = "YYYY";
+      if (dateGrouping === "d") {
+        outputFormat = userDateFormat;
+      } else if (dateGrouping === "m") {
+        outputFormat = userDateFormat.startsWith("YYYY") ? "YYYY/MM" : "MM/YYYY";
+      }
+
+      try {
+        const result = await pool.query(
+          `SELECT 
+            TO_CHAR(created_at, $1) AS date_grouping,
+            CASE
+              WHEN referrer = '' THEN 'direct'
+              WHEN SPLIT_PART(referrer, '/', 3) ~* '(google|bing|yahoo|duckduckgo)' THEN 'organic'
+              WHEN SPLIT_PART(referrer, '/', 3) ~* '(facebook|instagram|twitter|linkedin|pinterest|reddit|t.co)' THEN 'social'
+              ELSE 'referral'
+            END AS channel,
+            COUNT(DISTINCT session_id) AS visitors
+          FROM visits
+          WHERE site_id = $2
+            AND created_at BETWEEN $3 AND $4
+            AND SPLIT_PART(referrer, '/', 3) IS DISTINCT FROM $5
+          GROUP BY date_grouping, channel
+          ORDER BY date_grouping`,
+          [outputFormat, siteId, startAt, endAt, domain]
+        );
+
+        const rawData: Record<
+          string,
+          { direct: number; organic: number; social: number; referral: number }
+        > = {};
+
+        result.rows.forEach((row: any) => {
+          const dateKey = row.date_grouping;
+          const channel = row.channel as "direct" | "organic" | "social" | "referral";
+          const count = parseInt(row.visitors, 10);
+
+          if (!rawData[dateKey]) {
+            rawData[dateKey] = { direct: 0, organic: 0, social: 0, referral: 0 };
+          }
+          rawData[dateKey][channel] += count;
+        });
+
+        const start = dayjs.utc(startAt);
+        const end = dayjs.utc(endAt);
+        const unit: dayjs.ManipulateType =
+          dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year";
+
+        const finalData: {
+          dateGrouping: string;
+          direct: number;
+          organic: number;
+          social: number;
+          referral: number;
+        }[] = [];
+
+        let cursor = start.startOf(unit);
+
+        while (cursor.isSameOrBefore(end, unit)) {
+          const key = cursor.format(outputFormat);
+          finalData.push({
+            dateGrouping: key,
+            direct: rawData[key]?.direct || 0,
+            organic: rawData[key]?.organic || 0,
+            social: rawData[key]?.social || 0,
+            referral: rawData[key]?.referral || 0,
+          });
+          cursor = cursor.add(1, unit);
+        }
+
+        return {
+          success: true,
+          message: "Acquisition trends fetched successfully.",
+          data: finalData,
+        };
+      } catch (err) {
+        console.error("Error in siteAcquisitionChannelsTrends:", err);
+        return {
+          success: false,
+          message: "Failed to fetch acquisition trends.",
+          data: [],
         };
       }
     },
