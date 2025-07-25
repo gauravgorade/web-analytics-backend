@@ -25,6 +25,7 @@ export const siteTypeDefs = gql`
     id: UUID!
     domain: String!
     publicKey: String!
+    scriptVerified: Boolean!
     createdAt: String!
   }
 

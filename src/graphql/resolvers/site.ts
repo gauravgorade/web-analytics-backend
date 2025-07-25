@@ -37,7 +37,7 @@ export const siteResolvers = {
         const result = await pool.query(
           `INSERT INTO sites (user_id, domain, public_key)
            VALUES ($1, $2, $3)
-           RETURNING id, domain, public_key, created_at`,
+           RETURNING id, domain, public_key, script_verified, created_at`,
           [userId, cleanedDomain, publicKey]
         );
 
@@ -47,6 +47,7 @@ export const siteResolvers = {
           id: site.id,
           domain: site.domain,
           publicKey: site.public_key,
+          scriptVerified: site.script_verified,
           createdAt: site.created_at,
         });
       } catch (error) {

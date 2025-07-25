@@ -20,7 +20,7 @@ export const userResolvers = {
         const result = await pool.query(
           `INSERT INTO users (name, email, password_hash)
            VALUES ($1, $2, $3)
-           RETURNING name, email, timezone, date_format`,
+           RETURNING name, email, timezone, date_format, pref_set`,
           [name, email, passwordHash]
         );
 
@@ -29,6 +29,7 @@ export const userResolvers = {
           email: result.rows[0].email,
           timezone: result.rows[0].timezone,
           dateFormat: result.rows[0].date_format,
+          prefSet: result.rows[0].pref_set,
         };
 
         return successResponse("User created successfully", user);
@@ -45,7 +46,7 @@ export const userResolvers = {
 
       try {
         const result = await pool.query(
-          `SELECT id, name, email, password_hash, timezone, date_format FROM users WHERE email = $1`,
+          `SELECT id, name, email, password_hash, timezone, date_format, pref_set FROM users WHERE email = $1`,
           [email]
         );
 
@@ -60,7 +61,7 @@ export const userResolvers = {
         }
 
         const siteRes = await pool.query(
-          `SELECT id, domain, public_key, created_at FROM sites WHERE user_id = $1`,
+          `SELECT id, domain, public_key, script_verified, created_at FROM sites WHERE user_id = $1`,
           [user.id]
         );
 
@@ -68,6 +69,7 @@ export const userResolvers = {
           id: site.id,
           domain: site.domain,
           publicKey: site.public_key,
+          scriptVerified: site.script_verified,
           createdAt: site.created_at,
         }));
 
@@ -82,6 +84,7 @@ export const userResolvers = {
             email: user.email,
             timezone: user.timezone,
             dateFormat: user.date_format,
+            prefSet: user.pref_set,
             sites,
           },
         });
