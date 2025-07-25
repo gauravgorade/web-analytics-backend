@@ -7,12 +7,22 @@
   const COLLECT_URL = BASE_URL + "/collect";
   const EVENT_URL = BASE_URL + "/event";
 
+  const VISITOR_ID_KEY = "_putlerwa_visitor_id";
   const SESSION_ID_KEY = "_putlerwa_session_id";
   const LAST_ACTIVITY_KEY = "_putlerwa_last_activity";
   const SESSION_TIMEOUT_MINUTES = 5;
   const timeoutDuration = SESSION_TIMEOUT_MINUTES * 60 * 1000;
 
   const now = () => Date.now();
+
+  function getOrCreateVisitorId() {
+    let visitorId = localStorage.getItem(VISITOR_ID_KEY);
+    if (!visitorId) {
+      visitorId = crypto.randomUUID();
+      localStorage.setItem(VISITOR_ID_KEY, visitorId);
+    }
+    return visitorId;
+  }
 
   function hasSessionExpired() {
     const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
@@ -36,6 +46,7 @@
     }
   }
 
+  let visitorId = getOrCreateVisitorId();
   let sessionId = getOrCreateSession();
 
   function updateActivity() {
@@ -53,7 +64,6 @@
     }, timeoutDuration);
   }
 
-  // Reset inactivity timer on interaction
   ["click", "scroll", "keydown", "mousemove", "visibilitychange"].forEach((event) => {
     window.addEventListener(event, updateActivity);
   });
@@ -62,6 +72,7 @@
 
   const baseData = {
     site_public_key: SITE_PUBLIC_KEY,
+    visitor_id: visitorId,
     session_id: sessionId,
     user_agent: navigator.userAgent,
     device_type: (() => {
@@ -107,6 +118,7 @@
   function sendEvent(name, data = {}) {
     const payload = {
       site_public_key: SITE_PUBLIC_KEY,
+      visitor_id: visitorId,
       session_id: sessionId,
       name,
       event_data: data,

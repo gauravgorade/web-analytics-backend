@@ -134,12 +134,19 @@ export const siteResolvers = {
         const [
           uniqueVisitorsResult,
           totalVisitsResult,
+          totalPageviewsResult,
           viewsPerVisitResult,
           bounceRateResult,
           averageDurationResult,
         ] = await Promise.all([
           pool.query(
             `SELECT COUNT(DISTINCT session_id) AS count
+             FROM visits
+             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            [siteId, startAt, endAt]
+          ),
+          pool.query(
+            `SELECT COUNT(*) AS count
              FROM visits
              WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
@@ -187,7 +194,7 @@ export const siteResolvers = {
         return successResponse("Site KPI stats fetched", {
           uniqueVisitors: parseInt(uniqueVisitorsResult.rows[0].count || "0"),
           totalVisits: parseInt(totalVisitsResult.rows[0].count || "0"),
-          totalPageviews: parseInt(totalVisitsResult.rows[0].count || "0"),
+          totalPageviews: parseInt(totalPageviewsResult.rows[0].count || "0"),
           viewsPerVisit: parseFloat(viewsPerVisitResult.rows[0].value || "0"),
           bounceRate: parseFloat(bounceRateResult.rows[0].value || "0"),
           averageVisitDuration: parseFloat(averageDurationResult.rows[0].value || "0"),

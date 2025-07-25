@@ -4,7 +4,7 @@ import { pool } from "../db";
 const router = Router();
 
 router.post("/", async (req: Request, res: Response): Promise<void> => {
-  const { site_public_key, session_id, name, event_data } = req.body;
+  const { site_public_key, visitor_id, session_id, name, event_data } = req.body;
 
   if (!site_public_key || !name) {
     res.status(400).json({ error: "Missing required fields: site_public_key or name" });
@@ -13,7 +13,9 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
 
   try {
     // Get internal site_id from public_key
-    const { rows } = await pool.query("SELECT id FROM sites WHERE public_key = $1", [site_public_key]);
+    const { rows } = await pool.query("SELECT id FROM sites WHERE public_key = $1", [
+      site_public_key,
+    ]);
 
     if (rows.length === 0) {
       res.status(400).json({ error: "Invalid site public key" });
@@ -25,12 +27,13 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     await pool.query(
       `INSERT INTO events (
         site_id,
+        visitor_id,
         session_id,
         name,
         event_data,
         created_at
       ) VALUES ($1, $2, $3, $4, NOW())`,
-      [site_id, session_id || null, name, event_data ? JSON.stringify(event_data) : null]
+      [site_id, visitor_id, session_id, name, event_data ? JSON.stringify(event_data) : null]
     );
 
     res.status(200).json({ success: true });

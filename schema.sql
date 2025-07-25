@@ -22,6 +22,7 @@ CREATE TABLE visits (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
   session_id TEXT,
+  visitor_id TEXT,
   url TEXT,
   referrer TEXT,
   user_agent TEXT,
@@ -38,6 +39,7 @@ CREATE TABLE events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
   session_id TEXT,
+  visitor_id TEXT,
   name TEXT NOT NULL,
   event_data JSONB,
   created_at TIMESTAMPTZ DEFAULT now()

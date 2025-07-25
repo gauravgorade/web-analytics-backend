@@ -6,7 +6,7 @@ import geoip from "geoip-lite";
 const router = Router();
 
 router.post("/", async (req: Request, res: Response): Promise<void> => {
-  const { site_public_key, session_id, url, referrer, user_agent, device_type } = req.body;
+  const { site_public_key, visitor_id,session_id, url, referrer, user_agent, device_type } = req.body;
 
   if (!site_public_key || !url) {
     res.status(400).json({ error: "Missing required fields" });
@@ -31,6 +31,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     await pool.query(
       `INSERT INTO visits (
         site_id,
+        visitor_id,
         session_id,
         url,
         referrer,
@@ -43,7 +44,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         browser,
         created_at
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`,
-      [site_id, session_id || null, url, referrer || null, user_agent || null, device_type || null, geo?.country || null, geo?.region || null, geo?.city || null, ua.os.toString(), ua.toAgent()]
+      [site_id, visitor_id, session_id, url, referrer, user_agent, device_type, geo?.country, geo?.region, geo?.city, ua.os.toString(), ua.toAgent()]
     );
 
     res.status(200).json({ success: true });
