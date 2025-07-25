@@ -25,6 +25,7 @@ export const userTypeDefs = gql`
     email: String!
     timezone: String!
     dateFormat: String!
+    prefSet: Boolean!
     sites: [SitePayload!]!
   }
 
