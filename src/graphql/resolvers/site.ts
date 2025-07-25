@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { pool } from "../../db";
 import { successResponse, errorResponse } from "../../utils/response";
-import { assertAuthenticated, assertUserOwnsSite, authorizeSiteAccess, dayjs } from "../../utils";
+import { assertAuthenticated, authorizeSiteAccess, dayjs } from "../../utils";
 
 export const siteResolvers = {
   Mutation: {

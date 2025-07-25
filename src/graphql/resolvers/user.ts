@@ -52,12 +52,12 @@ export const userResolvers = {
 
         const user = result.rows[0];
         if (!user) {
-          return errorResponse("Invalid credentials", null);
+          return errorResponse("No account found with this email. Please check and try again.", null);
         }
 
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) {
-          return errorResponse("Invalid credentials", null);
+          return errorResponse("The password you entered is incorrect. Please try again.", null);
         }
 
         const siteRes = await pool.query(
