@@ -43,7 +43,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         os,
         browser,
         created_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())`,
       [site_id, visitor_id, session_id, url, referrer, user_agent, device_type, geo?.country, geo?.region, geo?.city, ua.os.toString(), ua.toAgent()]
     );
 

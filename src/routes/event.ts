@@ -32,7 +32,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         name,
         event_data,
         created_at
-      ) VALUES ($1, $2, $3, $4, NOW())`,
+      ) VALUES ($1,$2,$3,$4,$5,NOW())`,
       [site_id, visitor_id, session_id, name, event_data ? JSON.stringify(event_data) : null]
     );
 
