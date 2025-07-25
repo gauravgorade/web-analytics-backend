@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "bunyan": "^1.8.15",
     "cors": "^2.8.5",
     "dayjs": "^1.11.13",
     "express": "^5.1.0",
@@ -24,6 +25,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@types/bunyan": "^1.8.11",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/geoip-lite": "^1.4.4",

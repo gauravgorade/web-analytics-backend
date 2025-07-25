@@ -12,7 +12,7 @@ export const userResolvers = {
       try {
         const existing = await pool.query(`SELECT id FROM users WHERE email = $1`, [email]);
         if ((existing?.rowCount ?? 0) > 0) {
-          return errorResponse("Email already exists", null);
+          return errorResponse("An account with this email already exists.", null);
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
