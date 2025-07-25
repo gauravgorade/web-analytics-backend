@@ -69,39 +69,38 @@ export const siteResolvers = {
 
         const now = dayjs().tz(userTimezone);
         const fiveMinutesAgo = now.subtract(5, "minute").utc().toISOString();
-
         const startOfToday = now.startOf("day").utc().toISOString();
         const startOf7DaysAgo = now.subtract(7, "days").startOf("day").utc().toISOString();
         const startOf30DaysAgo = now.subtract(30, "days").startOf("day").utc().toISOString();
 
         const [liveUsersResult, avgUsersResult] = await Promise.all([
           pool.query(
-            `SELECT COUNT(DISTINCT session_id) AS count
-         FROM visits
-         WHERE site_id = $1 AND created_at >= $2`,
+            `SELECT COUNT(DISTINCT visitor_id) AS count
+             FROM visits
+             WHERE site_id = $1 AND created_at >= $2`,
             [siteId, fiveMinutesAgo]
           ),
           pool.query(
             `SELECT
-          COUNT(DISTINCT CASE WHEN created_at >= $2 THEN session_id END) AS daily,
-          (
-            SELECT AVG(day_count) FROM (
-              SELECT COUNT(DISTINCT session_id) AS day_count
-              FROM visits
-              WHERE site_id = $1 AND created_at >= $3
-              GROUP BY DATE_TRUNC('day', created_at)
-            ) AS daily_counts
-          ) AS weekly,
-          (
-            SELECT AVG(day_count) FROM (
-              SELECT COUNT(DISTINCT session_id) AS day_count
-              FROM visits
-              WHERE site_id = $1 AND created_at >= $4
-              GROUP BY DATE_TRUNC('day', created_at)
-            ) AS daily_counts
-          ) AS monthly
-        FROM visits
-        WHERE site_id = $1`,
+              COUNT(DISTINCT CASE WHEN created_at >= $2 THEN visitor_id END) AS daily,
+              (
+                SELECT ROUND(AVG(daily_count)) FROM (
+                  SELECT COUNT(DISTINCT visitor_id) AS daily_count
+                  FROM visits
+                  WHERE site_id = $1 AND created_at >= $3
+                  GROUP BY DATE_TRUNC('day', created_at)
+                ) AS daily_counts
+              ) AS weekly,
+              (
+                SELECT ROUND(AVG(daily_count)) FROM (
+                  SELECT COUNT(DISTINCT visitor_id) AS daily_count
+                  FROM visits
+                  WHERE site_id = $1 AND created_at >= $4
+                  GROUP BY DATE_TRUNC('day', created_at)
+                ) AS daily_counts
+              ) AS monthly
+            FROM visits
+            WHERE site_id = $1`,
             [siteId, startOfToday, startOf7DaysAgo, startOf30DaysAgo]
           ),
         ]);
@@ -140,53 +139,58 @@ export const siteResolvers = {
           averageDurationResult,
         ] = await Promise.all([
           pool.query(
+            `SELECT COUNT(DISTINCT visitor_id) AS count
+            FROM visits
+            WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            [siteId, startAt, endAt]
+          ),
+
+          pool.query(
             `SELECT COUNT(DISTINCT session_id) AS count
-             FROM visits
-             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            FROM visits
+            WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
+
           pool.query(
             `SELECT COUNT(*) AS count
-             FROM visits
-             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+            FROM visits
+            WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
-          pool.query(
-            `SELECT COUNT(*) AS count
-             FROM visits
-             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
-            [siteId, startAt, endAt]
-          ),
+
           pool.query(
             `SELECT CASE
-               WHEN COUNT(DISTINCT session_id) = 0 THEN 0
-               ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
-             END AS value
-             FROM visits
-             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
+              WHEN COUNT(DISTINCT session_id) = 0 THEN 0
+              ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
+            END AS value
+            FROM visits
+            WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
             [siteId, startAt, endAt]
           ),
+
           pool.query(
             `SELECT CASE
-               WHEN COUNT(*) = 0 THEN 0
-               ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
-             END AS value
-             FROM (
-               SELECT session_id, COUNT(*) AS visit_count
-               FROM visits
-               WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-               GROUP BY session_id
-             ) sub`,
+              WHEN COUNT(*) = 0 THEN 0
+              ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
+            END AS value
+            FROM (
+              SELECT session_id, COUNT(*) AS visit_count
+              FROM visits
+              WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+              GROUP BY session_id
+            ) sub`,
             [siteId, startAt, endAt]
           ),
+
           pool.query(
             `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
-             FROM (
-               SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
-               FROM visits
-               WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
-               GROUP BY session_id
-             ) sub`,
+            FROM (
+              SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
+              FROM visits
+              WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
+              GROUP BY session_id
+            ) sub`,
             [siteId, startAt, endAt]
           ),
         ]);
@@ -200,7 +204,7 @@ export const siteResolvers = {
           averageVisitDuration: parseFloat(averageDurationResult.rows[0].value || "0"),
         });
       } catch (error) {
-        console.error("Error in siteKPIStats:", error);
+        console.error("Error in siteKPISummary:", error);
         return errorResponse("Failed to fetch site KPI stats.", { data: null });
       }
     },
@@ -237,7 +241,7 @@ export const siteResolvers = {
         const result = await pool.query(
           `SELECT 
             TO_CHAR(created_at, $1) AS date_grouping,
-            COUNT(DISTINCT session_id) AS visitors,
+            COUNT(DISTINCT visitor_id) AS visitors,
             COUNT(url) AS pageviews
           FROM visits
           WHERE site_id = $2 AND created_at BETWEEN $3 AND $4
@@ -311,7 +315,7 @@ export const siteResolvers = {
         const result = await pool.query(
           `SELECT 
             url,
-            COUNT(DISTINCT session_id) AS visitors
+            COUNT(DISTINCT visitor_id) AS visitors
           FROM visits
           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
           GROUP BY url
@@ -384,7 +388,7 @@ export const siteResolvers = {
               WHEN referrer = '' THEN 'Direct'
               ELSE COALESCE(NULLIF(SPLIT_PART(referrer, '/', 3), ''), 'Direct')
             END AS source,
-            COUNT(DISTINCT session_id) AS visitors
+            COUNT(DISTINCT visitor_id) AS visitors
           FROM visits
           WHERE site_id = $1
             AND created_at BETWEEN $2 AND $3
@@ -427,7 +431,7 @@ export const siteResolvers = {
         const result = await pool.query(
           `SELECT 
              device_type,
-             COUNT(*) AS count
+             COUNT(DISTINCT session_id) AS count
           FROM visits
           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
           GROUP BY device_type`,
