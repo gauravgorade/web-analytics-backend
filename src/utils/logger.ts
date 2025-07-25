@@ -1,7 +1,7 @@
 import bunyan from 'bunyan';
 import path from 'path';
 
-const logDir = path.resolve(__dirname, '../../logs');
+const logDir = path.resolve(__dirname, '../../../logs');
 
 export const logger = bunyan.createLogger({
   name: 'web-analytics-backend',
