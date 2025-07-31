@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2020", // Output JavaScript will use modern features (like optional chaining)
+    "target": "ES2022", // Output JavaScript will use modern features (like optional chaining)
+    "lib": ["es2022"], // Specify the libraries to include during compilation
     "module": "CommonJS", // Use CommonJS module system (required by Node.js)
     "rootDir": "./src", // Source TypeScript files are inside the "src" folder
     "outDir": "./dist", // Compiled JavaScript will be emitted to "dist"
@@ -13,7 +14,7 @@
     "forceConsistentCasingInFileNames": true, // Prevent case mismatches in import paths (important on Linux/WSL)
     "skipLibCheck": true, // Skip type checking for declaration files in node_modules
     "sourceMap": false, // Generate .map files for debugging (useful in development)
-    "removeComments": true, // Remove all comments in the output JS (for production)
+    "removeComments": true // Remove all comments in the output JS (for production)
   },
   "include": ["src/**/*"], // Include all files in src recursively
   "exclude": ["node_modules", "dist"] // Ignore node_modules and output directory

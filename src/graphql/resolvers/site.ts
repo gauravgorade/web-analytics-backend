@@ -11,11 +11,16 @@ export const siteResolvers = {
       if (!auth.success) return auth;
       const userId = auth?.userId;
 
+      if (!domain || typeof domain !== "string" || domain.trim() === "") {
+        return errorResponse("Domain is required.", { site: null });
+      } else if (!/^(?!-)[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(domain)) {
+        return errorResponse("Domain is invalid.", { site: null });
+      }
+
       const cleanedDomain = domain
         .trim()
         .toLowerCase()
-        .replace(/^https?:\/\//, "")
-        .replace(/^www\./, "");
+        .replace(/^https?:\/\//, "");
 
       try {
         const existing = await pool.query(

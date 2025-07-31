@@ -12,6 +12,11 @@ export const userTypeDefs = gql`
     password: String!
   }
 
+  input PreferencesInput {
+    timezone: String!
+    dateFormat: String!
+  }
+
   type UserPayload {
     name: String!
     email: String!
@@ -27,6 +32,14 @@ export const userTypeDefs = gql`
     dateFormat: String!
     prefSet: Boolean!
     sites: [SitePayload!]!
+  }
+
+  type PreferencesPayload {
+    name: String!
+    email: String!
+    timezone: String!
+    dateFormat: String!
+    prefSet: Boolean!
   }
 
   type LoginResponsePayload {
@@ -46,8 +59,15 @@ export const userTypeDefs = gql`
     data: LoginResponsePayload
   }
 
+  type PreferencesResponse implements MutationResponse {
+    success: Boolean!
+    message: String!
+    data: PreferencesPayload
+  }
+
   extend type Mutation {
     addUserWithHash(input: AddUserInput!): AddUserResponse
     login(input: LoginInput!): LoginResponse
+    addUserPreferences(input: PreferencesInput!): PreferencesResponse
   }
 `;
