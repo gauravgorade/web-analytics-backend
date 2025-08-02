@@ -1,15 +1,15 @@
 (function () {
   const scriptTag = document.currentScript;
   const SITE_PUBLIC_KEY = scriptTag?.getAttribute("site-key");
-  if (!SITE_PUBLIC_KEY) return console.warn("PUTLERWA Analytics: Missing site-key attribute.");
+  if (!SITE_PUBLIC_KEY) return console.warn("Web Analytics: Missing site-key attribute.");
 
   const BASE_URL = new URL(scriptTag.src).origin;
   const COLLECT_URL = BASE_URL + "/collect";
   const EVENT_URL = BASE_URL + "/event";
 
-  const VISITOR_ID_KEY = "_putlerwa_visitor_id";
-  const SESSION_ID_KEY = "_putlerwa_session_id";
-  const LAST_ACTIVITY_KEY = "_putlerwa_last_activity";
+  const VISITOR_ID_KEY = "_wa_visitor_id";
+  const SESSION_ID_KEY = "_wa_session_id";
+  const LAST_ACTIVITY_KEY = "_wa_last_activity";
   const SESSION_TIMEOUT_MINUTES = 5;
   const timeoutDuration = SESSION_TIMEOUT_MINUTES * 60 * 1000;
 

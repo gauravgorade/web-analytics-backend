@@ -99,7 +99,7 @@ export const userResolvers = {
         }));
 
         const token = jwt.sign({ userId: user.id, email: user.email }, config.JWT_SECRET, {
-          expiresIn: "7d",
+          expiresIn: "15d",
         });
 
         const finalData = {

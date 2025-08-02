@@ -30,8 +30,8 @@ export const siteResolvers = {
         }
 
         const cleanDomainForKey = cleanedDomain.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        const uniquePart = randomUUID().split("-")[0];
-        const publicKey = `PUTLERA-${cleanDomainForKey}-${uniquePart}`;
+        const uniquePart = randomUUID().split("-")[0].toUpperCase();
+        const publicKey = `WA-${cleanDomainForKey}${uniquePart}`;
 
         const result = await pool.query(
           `INSERT INTO sites (user_id, domain, public_key)
