@@ -34,6 +34,5 @@ app.get("/analytics.js", (req, res) => {
 
 // Start the server
 app.listen(config.PORT, () => {
-  console.log(`Server is running at http://localhost:${config.PORT}`);
-  console.log(`GraphQL available at http://localhost:${config.PORT}/v1/api/putler-analytics-api`);
+  console.log(`Server is running at ${config.PORT}`);
 });

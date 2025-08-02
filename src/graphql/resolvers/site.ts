@@ -12,9 +12,9 @@ export const siteResolvers = {
       const userId = auth?.userId;
 
       if (!domain || typeof domain !== "string" || domain.trim() === "") {
-        return errorResponse("Domain is required.", { site: null });
+        return errorResponse("Domain is required.");
       } else if (!/^(?!-)[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(domain)) {
-        return errorResponse("Domain is invalid.", { site: null });
+        return errorResponse("Domain is invalid.");
       }
 
       const cleanedDomain = domain
@@ -23,16 +23,10 @@ export const siteResolvers = {
         .replace(/^https?:\/\//, "");
 
       try {
-        const existing = await pool.query(
-          `SELECT id FROM sites WHERE user_id = $1 AND domain = $2`,
-          [userId, cleanedDomain]
-        );
+        const existing = await pool.query(`SELECT id FROM sites WHERE user_id = $1 AND domain = $2`, [userId, cleanedDomain]);
 
         if ((existing?.rowCount || 0) > 0) {
-          return errorResponse(
-            "This domain is already registered. Please check your dashboard or try a different one.",
-            { site: null }
-          );
+          return errorResponse("This domain is already registered. Please check your dashboard or try a different one.");
         }
 
         const cleanDomainForKey = cleanedDomain.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
@@ -56,14 +50,82 @@ export const siteResolvers = {
           createdAt: site.created_at,
         });
       } catch (error) {
-        return errorResponse(error instanceof Error ? error.message : "Something went wrong", {
-          site: null,
-        });
+        return errorResponse("Something went wrong");
       }
     },
   },
 
   Query: {
+    siteVerificationStatus: async (_: any, args: { siteId: string }, context: any) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success) return auth;
+
+      const { siteId } = args;
+
+      try {
+        const siteResult = await pool.query(`SELECT * FROM sites WHERE id = $1`, [siteId]);
+        const site = siteResult.rows[0];
+
+        if (site.script_verified) {
+          return successResponse("Tracking script successfully verified on the correct domain.", {
+            id: site.id,
+            domain: site.domain,
+            publicKey: site.public_key,
+            scriptVerified: true,
+            createdAt: site.created_at,
+          });
+        }
+
+        const visitResult = await pool.query(`SELECT DISTINCT url FROM visits WHERE site_id = $1 LIMIT 20`, [siteId]);
+        const visits = visitResult.rows;
+
+        if (visits.length === 0) {
+          return successResponse("Tracking script not detected yet. It might not be installed, or your site hasn't received any traffic yet.", {
+            id: site.id,
+            domain: site.domain,
+            publicKey: site.public_key,
+            scriptVerified: false,
+            createdAt: site.created_at,
+          });
+        }
+
+        const expectedDomain = site.domain;
+
+        const isValid = visits.some((visit) => {
+          try {
+            const visitDomain = new URL(visit.url).hostname;
+            return visitDomain === expectedDomain;
+          } catch {
+            return false;
+          }
+        });
+
+        if (isValid) {
+          if (!site.script_verified) {
+            await pool.query(`UPDATE sites SET script_verified = true WHERE id = $1`, [siteId]);
+          }
+
+          return successResponse("Tracking script has been verified and is now active.", {
+            id: site.id,
+            domain: site.domain,
+            publicKey: site.public_key,
+            scriptVerified: true,
+            createdAt: site.created_at,
+          });
+        } else {
+          return successResponse("Script detected, but installed on a different domain than expected", {
+            id: site.id,
+            domain: site.domain,
+            publicKey: site.public_key,
+            scriptVerified: false,
+            createdAt: site.created_at,
+          });
+        }
+      } catch (error) {
+        return errorResponse("Failed to verify site status");
+      }
+    },
+
     siteLiveStats: async (_: any, args: { siteId: string }, context: any) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
       if (!auth.success) return auth;
@@ -120,63 +182,52 @@ export const siteResolvers = {
           avgMonthlyUsers: Math.round(avg.monthly || 0),
         });
       } catch (error) {
-        console.error("Error in siteLiveStats:", error);
-        return errorResponse("Failed to fetch live stats.", { data: null });
+        return errorResponse("Failed to fetch live stats.");
       }
     },
 
-    siteKPISummary: async (
-      _: any,
-      args: { siteId: string; startAt: string; endAt: string },
-      context: any
-    ) => {
+    siteKPISummary: async (_: any, args: { siteId: string; startAt: string; endAt: string }, context: any) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
       if (!auth.success) return auth;
 
       const { siteId, startAt, endAt } = args;
 
       try {
-        const [
-          uniqueVisitorsResult,
-          totalVisitsResult,
-          totalPageviewsResult,
-          viewsPerVisitResult,
-          bounceRateResult,
-          averageDurationResult,
-        ] = await Promise.all([
-          pool.query(
-            `SELECT COUNT(DISTINCT visitor_id) AS count
+        const [uniqueVisitorsResult, totalVisitsResult, totalPageviewsResult, viewsPerVisitResult, bounceRateResult, averageDurationResult] =
+          await Promise.all([
+            pool.query(
+              `SELECT COUNT(DISTINCT visitor_id) AS count
             FROM visits
             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
-            [siteId, startAt, endAt]
-          ),
+              [siteId, startAt, endAt]
+            ),
 
-          pool.query(
-            `SELECT COUNT(DISTINCT session_id) AS count
+            pool.query(
+              `SELECT COUNT(DISTINCT session_id) AS count
             FROM visits
             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
-            [siteId, startAt, endAt]
-          ),
+              [siteId, startAt, endAt]
+            ),
 
-          pool.query(
-            `SELECT COUNT(*) AS count
+            pool.query(
+              `SELECT COUNT(*) AS count
             FROM visits
             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
-            [siteId, startAt, endAt]
-          ),
+              [siteId, startAt, endAt]
+            ),
 
-          pool.query(
-            `SELECT CASE
+            pool.query(
+              `SELECT CASE
               WHEN COUNT(DISTINCT session_id) = 0 THEN 0
               ELSE COUNT(*) * 1.0 / COUNT(DISTINCT session_id)
             END AS value
             FROM visits
             WHERE site_id = $1 AND created_at BETWEEN $2 AND $3`,
-            [siteId, startAt, endAt]
-          ),
+              [siteId, startAt, endAt]
+            ),
 
-          pool.query(
-            `SELECT CASE
+            pool.query(
+              `SELECT CASE
               WHEN COUNT(*) = 0 THEN 0
               ELSE COUNT(*) FILTER (WHERE visit_count = 1) * 1.0 / COUNT(*)
             END AS value
@@ -186,20 +237,20 @@ export const siteResolvers = {
               WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
               GROUP BY session_id
             ) sub`,
-            [siteId, startAt, endAt]
-          ),
+              [siteId, startAt, endAt]
+            ),
 
-          pool.query(
-            `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
+            pool.query(
+              `SELECT AVG(EXTRACT(EPOCH FROM max_time - min_time)) AS value
             FROM (
               SELECT MIN(created_at) AS min_time, MAX(created_at) AS max_time
               FROM visits
               WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
               GROUP BY session_id
             ) sub`,
-            [siteId, startAt, endAt]
-          ),
-        ]);
+              [siteId, startAt, endAt]
+            ),
+          ]);
 
         return successResponse("Site KPI stats fetched", {
           uniqueVisitors: parseInt(uniqueVisitorsResult.rows[0].count || "0"),
@@ -210,23 +261,17 @@ export const siteResolvers = {
           averageVisitDuration: parseFloat(averageDurationResult.rows[0].value || "0"),
         });
       } catch (error) {
-        console.error("Error in siteKPISummary:", error);
-        return errorResponse("Failed to fetch site KPI stats.", { data: null });
+        return errorResponse("Failed to fetch site KPI stats.");
       }
     },
 
-    siteTrafficTrends: async (
-      _: any,
-      args: { siteId: string; startAt: string; endAt: string; dateGrouping: "d" | "m" | "y" },
-      context: any
-    ) => {
+    siteTrafficTrends: async (_: any, args: { siteId: string; startAt: string; endAt: string; dateGrouping: "d" | "m" | "y" }, context: any) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
-      if (!auth.success) {
+      if (!auth.success)
         return {
           ...auth,
           data: [],
         };
-      }
 
       const { siteId, startAt, endAt, dateGrouping } = args;
 
@@ -266,8 +311,7 @@ export const siteResolvers = {
 
         const start = dayjs.utc(startAt);
         const end = dayjs.utc(endAt);
-        const unit: dayjs.ManipulateType =
-          dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year";
+        const unit: dayjs.ManipulateType = dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year";
 
         const finalData: {
           dateGrouping: string;
@@ -286,34 +330,19 @@ export const siteResolvers = {
           });
           cursor = cursor.add(1, unit);
         }
-
-        return {
-          success: true,
-          message: "Traffic trends fetched successfully.",
-          data: finalData,
-        };
+        return successResponse("Traffic trends fetched successfully.", finalData);
       } catch (err) {
-        console.error("Error in siteTrafficTrends:", err);
-        return {
-          success: false,
-          message: "Failed to fetch traffic trends.",
-          data: [],
-        };
+        return errorResponse("Failed to fetch traffic trends.", { data: [] });
       }
     },
 
-    siteTopPages: async (
-      _: any,
-      args: { siteId: string; startAt: string; endAt: string },
-      context: any
-    ) => {
+    siteTopPages: async (_: any, args: { siteId: string; startAt: string; endAt: string }, context: any) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
-      if (!auth.success) {
+      if (!auth.success)
         return {
           ...auth,
           data: [],
         };
-      }
 
       const { siteId, startAt, endAt } = args;
 
@@ -321,6 +350,7 @@ export const siteResolvers = {
         const result = await pool.query(
           `SELECT 
             url,
+            COUNT(*) AS pageviews,
             COUNT(DISTINCT visitor_id) AS visitors
           FROM visits
           WHERE site_id = $1 AND created_at BETWEEN $2 AND $3
@@ -330,61 +360,40 @@ export const siteResolvers = {
           [siteId, startAt, endAt]
         );
 
-        const data = result.rows.map((row) => {
+        const finalData = result.rows.map((row) => {
           try {
             const { pathname } = new URL(row.url);
             return {
               source: pathname || "/",
               visitors: Number(row.visitors),
+              pageviews: Number(row.pageviews),
             };
           } catch {
             return {
               source: row.url || "/",
               visitors: Number(row.visitors),
+              pageviews: Number(row.pageviews),
             };
           }
         });
-
-        return {
-          success: true,
-          message: "Top pages fetched successfully",
-          data,
-        };
+        return successResponse("Top pages fetched successfully", finalData);
       } catch (error) {
-        console.error("Error in siteTopPages:", error);
-        return {
-          success: false,
-          message: "Failed to fetch top pages",
-          data: [],
-        };
+        return errorResponse("Failed to fetch top pages", { data: [] });
       }
     },
 
-    siteTopChannels: async (
-      _: any,
-      args: { siteId: string; startAt: string; endAt: string },
-      context: any
-    ) => {
+    siteTopChannels: async (_: any, args: { siteId: string; startAt: string; endAt: string }, context: any) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success)
+        return {
+          ...auth,
+          data: [],
+        };
+        
+      const { siteId, startAt, endAt } = args;
+
       try {
-        const auth = await authorizeSiteAccess(context, args.siteId);
-        if (!auth.success) {
-          return {
-            ...auth,
-            data: [],
-          };
-        }
-
-        const { siteId, startAt, endAt } = args;
-
         const siteResult = await pool.query(`SELECT domain FROM sites WHERE id = $1`, [siteId]);
-
-        if (siteResult.rowCount === 0) {
-          return {
-            success: false,
-            message: "Site not found.",
-            data: [],
-          };
-        }
 
         const domain = siteResult.rows[0].domain;
 
@@ -405,29 +414,18 @@ export const siteResolvers = {
           [siteId, startAt, endAt, domain]
         );
 
-        return {
-          success: true,
-          message: "Top channels fetched successfully.",
-          data: result.rows.map((row) => ({
-            source: row.source,
-            visitors: Number(row.visitors),
-          })),
-        };
+        const finalData = result.rows.map((row) => ({
+          source: row.source,
+          visitors: Number(row.visitors),
+        }));
+
+        return successResponse("Top channels fetched successfully.", finalData);
       } catch (error) {
-        console.error("Error in siteTopChannels:", error);
-        return {
-          success: false,
-          message: "Failed to fetch top channels.",
-          data: [],
-        };
+        return errorResponse("Failed to fetch top channels.", { data: [] });
       }
     },
 
-    sessionsByDevice: async (
-      _: any,
-      args: { siteId: string; startAt: string; endAt: string },
-      context: any
-    ) => {
+    sessionsByDevice: async (_: any, args: { siteId: string; startAt: string; endAt: string }, context: any) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
       if (!auth.success) return auth;
 
@@ -459,25 +457,17 @@ export const siteResolvers = {
           else if (type === "tablet") tablet += count;
         }
 
-        const getPercentage = (value: number) =>
-          total > 0 ? parseFloat(((value / total) * 100).toFixed(2)) : 0;
+        const getPercentage = (value: number) => (total > 0 ? parseFloat(((value / total) * 100).toFixed(2)) : 0);
 
-        return {
-          success: true,
-          message: "Sessions by device (%) fetched successfully.",
-          data: {
-            desktop: getPercentage(desktop),
-            mobile: getPercentage(mobile),
-            tablet: getPercentage(tablet),
-          },
+        const finalData = {
+          desktop: getPercentage(desktop),
+          mobile: getPercentage(mobile),
+          tablet: getPercentage(tablet),
         };
+
+        return successResponse("Sessions by device (%) fetched successfully.", finalData);
       } catch (error) {
-        console.error("Error in sessionsByDevice:", error);
-        return {
-          success: false,
-          message: "Failed to fetch sessions by device.",
-          data: { desktop: 0, mobile: 0, tablet: 0 },
-        };
+        return errorResponse("Failed to fetch sessions by device.");
       }
     },
 
@@ -487,23 +477,15 @@ export const siteResolvers = {
       context: any
     ) => {
       const auth = await authorizeSiteAccess(context, args.siteId);
-      if (!auth.success) {
+      if (!auth.success)
         return {
           ...auth,
           data: [],
         };
-      }
 
       const { siteId, startAt, endAt, dateGrouping } = args;
 
       const siteResult = await pool.query(`SELECT domain FROM sites WHERE id = $1`, [siteId]);
-      if (siteResult.rowCount === 0) {
-        return {
-          success: false,
-          message: "Site not found.",
-          data: [],
-        };
-      }
 
       const domain = siteResult.rows[0].domain;
       const userDateFormat = context.user?.dateFormat || "DD/MM/YYYY";
@@ -535,10 +517,7 @@ export const siteResolvers = {
           [outputFormat, siteId, startAt, endAt, domain]
         );
 
-        const rawData: Record<
-          string,
-          { direct: number; organic: number; social: number; referral: number }
-        > = {};
+        const rawData: Record<string, { direct: number; organic: number; social: number; referral: number }> = {};
 
         result.rows.forEach((row: any) => {
           const dateKey = row.date_grouping;
@@ -553,8 +532,7 @@ export const siteResolvers = {
 
         const start = dayjs.utc(startAt);
         const end = dayjs.utc(endAt);
-        const unit: dayjs.ManipulateType =
-          dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year";
+        const unit: dayjs.ManipulateType = dateGrouping === "d" ? "day" : dateGrouping === "m" ? "month" : "year";
 
         const finalData: {
           dateGrouping: string;
@@ -577,19 +555,53 @@ export const siteResolvers = {
           });
           cursor = cursor.add(1, unit);
         }
-
-        return {
-          success: true,
-          message: "Acquisition trends fetched successfully.",
-          data: finalData,
-        };
+        return successResponse("Acquisition trends fetched successfully.", finalData);
       } catch (err) {
-        console.error("Error in siteAcquisitionChannelsTrends:", err);
+        return errorResponse("Failed to fetch acquisition trends.", { data: [] });
+      }
+    },
+
+    visitorShareByCountry: async (_: any, args: { siteId: string; startAt: string; endAt: string }, context: any) => {
+      const auth = await authorizeSiteAccess(context, args.siteId);
+      if (!auth.success)
         return {
-          success: false,
-          message: "Failed to fetch acquisition trends.",
+          ...auth,
           data: [],
         };
+
+      const { siteId, startAt, endAt } = args;
+
+      try {
+        const result = await pool.query(
+          `SELECT country, COUNT(DISTINCT visitor_id) AS count
+           FROM visits
+           WHERE site_id = $1
+             AND created_at BETWEEN $2 AND $3
+             AND TRIM(country) <> ''
+           GROUP BY country
+          `,
+          [siteId, startAt, endAt]
+        );
+
+        let total = 0;
+        const countryCounts: Record<string, number> = {};
+
+        for (const row of result.rows) {
+          const country = row.country;
+          const count = Number(row.count);
+          total += count;
+          countryCounts[country] = count;
+        }
+
+        const getPercentage = (value: number) => (total > 0 ? parseFloat(((value / total) * 100).toFixed(2)) : 0);
+
+        const finalData = Object.entries(countryCounts).map(([country, count]) => ({
+          country,
+          percent: getPercentage(count),
+        }));
+        return successResponse("Visitor share by country (%) fetched successfully.", finalData);
+      } catch (error) {
+        return errorResponse("Failed to fetch visitor share by country.", { data: [] });
       }
     },
   },

@@ -5,8 +5,8 @@ import { getUserById, getUserIdFromRequest } from "./utils";
 import { customPlugin } from "./graphql/plugin";
 
 export const postgraphileMiddleware = postgraphile(config.DATABASE_URL, "public", {
-  graphqlRoute: "/v1/api/putler-analytics-api",
-  graphiqlRoute: "/v1/api/putler-analytics-api-i",
+  graphqlRoute: "/v1/api/web-analytics-api",
+  graphiqlRoute: "/v1/api/web-analytics-api-i",
   graphiql: true,
   enhanceGraphiql: true,
   dynamicJson: true,

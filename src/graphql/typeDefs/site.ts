@@ -14,6 +14,7 @@ export const siteTypeDefs = gql`
   type TopPagesPayload {
     source: String!
     visitors: Int!
+    pageviews: Int!
   }
 
   type TopChannelsPayload {
@@ -59,7 +60,18 @@ export const siteTypeDefs = gql`
     referral: Int!
   }
 
+  type VisitorSharePayload {
+    country: String!
+    percent: Float!
+  }
+
   type AddSiteResponse implements MutationResponse {
+    success: Boolean!
+    message: String!
+    data: SitePayload
+  }
+
+  type SiteVerificationStatusResponse implements QueryResponse {
     success: Boolean!
     message: String!
     data: SitePayload
@@ -107,27 +119,25 @@ export const siteTypeDefs = gql`
     data: [AcquisitionChannelsTrendsPayload!]!
   }
 
+  type VisitorShareByCountryResponse implements QueryResponse {
+    success: Boolean!
+    message: String!
+    data: [VisitorSharePayload!]!
+  }
+
   extend type Mutation {
     addSite(input: AddSiteInput!): AddSiteResponse
   }
 
   extend type Query {
+    siteVerificationStatus(siteId: UUID!): SiteVerificationStatusResponse!
     siteLiveStats(siteId: UUID!): SiteLiveStatsResponse!
     siteKPISummary(siteId: UUID!, startAt: String!, endAt: String!): SiteKPISummaryResponse!
-    siteTrafficTrends(
-      siteId: UUID!
-      startAt: String!
-      endAt: String!
-      dateGrouping: String!
-    ): TrafficTrendsResponse!
+    siteTrafficTrends(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): TrafficTrendsResponse!
     siteTopPages(siteId: UUID!, startAt: String!, endAt: String!): TopPagesResponse!
     siteTopChannels(siteId: UUID!, startAt: String!, endAt: String!): TopChannelsResponse!
     sessionsByDevice(siteId: UUID!, startAt: String!, endAt: String!): SessionsByDeviceResponse!
-    siteAcquisitionChannelsTrends(
-      siteId: UUID!
-      startAt: String!
-      endAt: String!
-      dateGrouping: String!
-    ): AcquisitionChannelsTrendsResponse!
+    siteAcquisitionChannelsTrends(siteId: UUID!, startAt: String!, endAt: String!, dateGrouping: String!): AcquisitionChannelsTrendsResponse!
+    visitorShareByCountry(siteId: UUID!, startAt: String!, endAt: String!): VisitorShareByCountryResponse!
   }
 `;

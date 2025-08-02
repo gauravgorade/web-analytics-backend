@@ -10,27 +10,27 @@ export const userResolvers = {
       const { name, email, password } = args.input;
 
       if (!name || typeof name !== "string" || name.trim() === "") {
-        return errorResponse("Name is required.", null);
+        return errorResponse("Name is required.");
       }
 
       if (!email || typeof email !== "string" || email.trim() === "") {
-        return errorResponse("Email is required.", null);
+        return errorResponse("Email is required.");
       } else if (!/^\S+@\S+\.\S+$/.test(email)) {
-        return errorResponse("Invalid email address.", null);
+        return errorResponse("Invalid email address.");
       }
 
       if (!password || typeof password !== "string" || password.trim() === "") {
-        return errorResponse("Password is required.", null);
+        return errorResponse("Password is required.");
       } else if (password.length < 6) {
-        return errorResponse("Password must be at least 6 characters.", null);
+        return errorResponse("Password must be at least 6 characters.");
       } else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-        return errorResponse("Password must contain both letters and numbers.", null);
+        return errorResponse("Password must contain both letters and numbers.");
       }
 
       try {
         const existing = await pool.query(`SELECT id FROM users WHERE email = $1`, [email]);
         if ((existing?.rowCount ?? 0) > 0) {
-          return errorResponse("An account with this email already exists.", null);
+          return errorResponse("An account with this email already exists.");
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -52,7 +52,7 @@ export const userResolvers = {
 
         return successResponse("User created successfully", user);
       } catch (error) {
-        return errorResponse(error instanceof Error ? error.message : "Something went wrong", null);
+        return errorResponse("Something went wrong");
       }
     },
 
@@ -60,42 +60,35 @@ export const userResolvers = {
       const { email, password } = args.input;
 
       if (!email || typeof email !== "string" || email.trim() === "") {
-        return errorResponse("Email is required.", null);
+        return errorResponse("Email is required.");
       } else if (!/^\S+@\S+\.\S+$/.test(email)) {
-        return errorResponse("Invalid email address.", null);
+        return errorResponse("Invalid email address.");
       }
 
       if (!password || typeof password !== "string" || password.trim() === "") {
-        return errorResponse("Password is required.", null);
+        return errorResponse("Password is required.");
       } else if (password.length < 6) {
-        return errorResponse("Password must be at least 6 characters.", null);
+        return errorResponse("Password must be at least 6 characters.");
       } else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-        return errorResponse("Password must contain both letters and numbers.", null);
+        return errorResponse("Password must contain both letters and numbers.");
       }
 
       try {
-        const result = await pool.query(
-          `SELECT id, name, email, password_hash, timezone, date_format, pref_set FROM users WHERE email = $1`,
-          [email]
-        );
+        const result = await pool.query(`SELECT id, name, email, password_hash, timezone, date_format, pref_set FROM users WHERE email = $1`, [
+          email,
+        ]);
 
         const user = result.rows[0];
         if (!user) {
-          return errorResponse(
-            "No account found with this email. Please check and try again.",
-            null
-          );
+          return errorResponse("No account found with this email. Please check and try again.");
         }
 
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) {
-          return errorResponse("The password you entered is incorrect. Please try again.", null);
+          return errorResponse("The password you entered is incorrect. Please try again.");
         }
 
-        const siteRes = await pool.query(
-          `SELECT id, domain, public_key, script_verified, created_at FROM sites WHERE user_id = $1`,
-          [user.id]
-        );
+        const siteRes = await pool.query(`SELECT id, domain, public_key, script_verified, created_at FROM sites WHERE user_id = $1`, [user.id]);
 
         const sites = siteRes.rows.map((site: any) => ({
           id: site.id,
@@ -109,7 +102,7 @@ export const userResolvers = {
           expiresIn: "7d",
         });
 
-        return successResponse("Login successful", {
+        const finalData = {
           token,
           user: {
             name: user.name,
@@ -119,12 +112,14 @@ export const userResolvers = {
             prefSet: user.pref_set,
             sites,
           },
-        });
+        };
+
+        return successResponse("Login successful", finalData);
       } catch (error) {
-        return errorResponse(error instanceof Error ? error.message : "Something went wrong", null);
+        return errorResponse("Something went wrong");
       }
     },
-    
+
     addUserPreferences: async (_: any, args: any, context: any) => {
       const { timezone, dateFormat } = args.input;
 
@@ -133,12 +128,12 @@ export const userResolvers = {
       const userId = auth?.userId;
 
       if (!timezone || !Intl.supportedValuesOf("timeZone").includes(timezone)) {
-        return errorResponse("Invalid or missing timezone", null);
+        return errorResponse("Invalid or missing timezone");
       }
 
       const validFormats = ["YYYY/MM/DD", "MM/DD/YYYY", "DD/MM/YYYY"];
       if (!dateFormat || !validFormats.includes(dateFormat)) {
-        return errorResponse("Invalid or missing date format", null);
+        return errorResponse("Invalid or missing date format");
       }
 
       try {
@@ -158,15 +153,17 @@ export const userResolvers = {
 
         const user = result.rows[0];
 
-        return successResponse("Preferences saved successfully", {
+        const finalData = {
           name: user.name,
           email: user.email,
           timezone: user.timezone,
           dateFormat: user.date_format,
           prefSet: user.pref_set,
-        });
+        };
+
+        return successResponse("Preferences saved successfully", finalData);
       } catch (error) {
-        return errorResponse(error instanceof Error ? error.message : "Something went wrong", null);
+        return errorResponse("Something went wrong");
       }
     },
   },
