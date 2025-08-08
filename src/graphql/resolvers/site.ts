@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { pool } from "../../db";
 import { successResponse, errorResponse } from "../../utils/response";
-import { assertAuthenticated, authorizeSiteAccess, dayjs } from "../../utils";
+import { assertAuthenticated, authorizeSiteAccess, dayjs, generateSitePublicKey } from "../../utils";
 
 export const siteResolvers = {
   Mutation: {
@@ -29,9 +29,7 @@ export const siteResolvers = {
           return errorResponse("This domain is already registered. Please check your dashboard or try a different one.");
         }
 
-        const cleanDomainForKey = cleanedDomain.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        const uniquePart = randomUUID().split("-")[0].toUpperCase();
-        const publicKey = `WA-${cleanDomainForKey}${uniquePart}`;
+        const publicKey = generateSitePublicKey(cleanedDomain);
 
         const result = await pool.query(
           `INSERT INTO sites (user_id, domain, public_key)
